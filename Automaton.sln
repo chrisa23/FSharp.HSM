@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Automaton", "Automaton\Automaton.fsproj", "{37D3E910-158A-479F-B0DF-82F0ED4F1F7F}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Automaton.Tests", "Automaton.Tests\Automaton.Tests.fsproj", "{6E2FF74F-1090-4587-B39B-F6486C4160F7}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{27C55605-69AA-4A31-82D9-332B4960A7F8}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{37D3E910-158A-479F-B0DF-82F0ED4F1F7F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{37D3E910-158A-479F-B0DF-82F0ED4F1F7F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{37D3E910-158A-479F-B0DF-82F0ED4F1F7F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{37D3E910-158A-479F-B0DF-82F0ED4F1F7F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6E2FF74F-1090-4587-B39B-F6486C4160F7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E2FF74F-1090-4587-B39B-F6486C4160F7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E2FF74F-1090-4587-B39B-F6486C4160F7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E2FF74F-1090-4587-B39B-F6486C4160F7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

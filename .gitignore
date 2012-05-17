@@ -1,0 +1,31 @@
+# Build Folders
+bin/
+obj/
+build/
+publish/
+perf/
+
+# Native libraries
+#lib
+#lib-*
+#^lib/**/*.txt
+
+# NuGet-related
+packages
+nuget.exe
+
+# User Settings
+*.suo
+*.user
+*.userprefs
+
+# Other
+*.snk
+_ReSharper.*
+*.swp
+*.pidb
+*.cache
+*.dotCover
+*.ncrunchproject
+*.ncrunchsolution
+*.Cache
