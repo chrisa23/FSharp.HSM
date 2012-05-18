@@ -21,8 +21,7 @@ module PhoneCall =
     let stopTimer() = printfn "%A ended" DateTime.Now
 
     let phoneCall = 
-      { Current = State.OffHook
-        States = 
+      new StateMachine<State,Trigger>(
           [ configure State.OffHook
               |> permit Trigger.CallDialed State.Ringing
             configure State.Ringing
@@ -35,10 +34,12 @@ module PhoneCall =
             configure State.OnHold
               |> substateOf State.Connected
               |> permit Trigger.TakenOffHold State.Connected
-              |> permit Trigger.HungUp State.OffHook ] }
+              |> permit Trigger.HungUp State.OffHook ] )
+    
 
-    let showState() = 
-      printfn "%A" phoneCall.Current
+    let showState state = printfn "%A" state
+    phoneCall.StateChanged.Add showState
+    
     let fire trigger = phoneCall.Fire trigger
     
     open NUnit.Framework
@@ -46,22 +47,22 @@ module PhoneCall =
     
     [<Test>]
     let ``Call``() =
+
       fire Trigger.CallDialed
-      phoneCall.IsInState(State.Connected) |> should equal false
-      showState()
+      phoneCall.IsIn(State.Connected) |> should equal false
+      
       fire Trigger.CallConnected
-      phoneCall.IsInState(State.Connected) |> should equal true
-      phoneCall.IsInState(State.OnHold) |> should equal false
-      showState()
+      phoneCall.IsIn(State.Connected) |> should equal true
+      phoneCall.IsIn(State.OnHold) |> should equal false
+      
       fire Trigger.PlacedOnHold
-      phoneCall.IsInState(State.Connected) |> should equal true
-      phoneCall.IsInState(State.OnHold) |> should equal true
-      showState()
+      phoneCall.IsIn(State.Connected) |> should equal true
+      phoneCall.IsIn(State.OnHold) |> should equal true
+      
       fire Trigger.TakenOffHold
-      phoneCall.IsInState(State.Connected) |> should equal true
-      phoneCall.IsInState(State.OnHold) |> should equal false
-      showState()
+      phoneCall.IsIn(State.Connected) |> should equal true
+      phoneCall.IsIn(State.OnHold) |> should equal false
+      
       fire Trigger.HungUp
-      phoneCall.IsInState(State.Connected) |> should equal false
-      showState()
-      phoneCall.Current |> should equal State.OffHook
+      phoneCall.IsIn(State.Connected) |> should equal false
+      phoneCall.State |> should equal State.OffHook
