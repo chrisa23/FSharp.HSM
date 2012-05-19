@@ -17,8 +17,13 @@ module PhoneCall =
      | PlacedOnHold
      | TakenOffHold
 
-    let startTimer() = printfn "%A connected" DateTime.Now
-    let stopTimer() = printfn "%A ended" DateTime.Now
+    let mutable timerOn = false
+    let startTimer() = 
+      printfn "%A connected" DateTime.Now
+      timerOn <- true
+    let stopTimer() = 
+      printfn "%A ended" DateTime.Now
+      timerOn <- false
 
     let phoneCall = 
       new StateMachine<State,Trigger>(
@@ -33,9 +38,7 @@ module PhoneCall =
               |> onExit (fun _ -> stopTimer())
             configure State.OnHold
               |> substateOf State.Connected
-              |> permit Trigger.TakenOffHold State.Connected
-              |> permit Trigger.HungUp State.OffHook ] )
-    
+              |> permit Trigger.TakenOffHold State.Connected ] )
 
     let showState state = printfn "%A" state
     phoneCall.StateChanged.Add showState
@@ -45,24 +48,48 @@ module PhoneCall =
     open NUnit.Framework
     open FsUnit
     
+    let check trueStates falseStates  (timer: bool) = 
+        timerOn |> should equal timer
+        trueStates |> List.iter (fun x ->
+           phoneCall.IsIn x |> should equal true)
+        falseStates |> List.iter (fun x ->
+           phoneCall.IsIn x |> should equal false)
+
     [<Test>]
     let ``Call``() =
 
       fire Trigger.CallDialed
-      phoneCall.IsIn(State.Connected) |> should equal false
+      
+      check [ State.Ringing ] [State.Connected; State.OnHold; State.OffHook ] false
       
       fire Trigger.CallConnected
-      phoneCall.IsIn(State.Connected) |> should equal true
-      phoneCall.IsIn(State.OnHold) |> should equal false
+      
+      check [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
       
       fire Trigger.PlacedOnHold
-      phoneCall.IsIn(State.Connected) |> should equal true
-      phoneCall.IsIn(State.OnHold) |> should equal true
+
+      check [ State.Connected; State.OnHold ] [State.Ringing; State.OffHook ] true
       
+      fire Trigger.HungUp//i should be able to hang up here based on Connected state
+
+      check [ State.OffHook; ] [State.Ringing; State.Connected; State.OnHold ] false
+      
+      fire Trigger.CallDialed
+
+      check [ State.Ringing ] [State.Connected; State.OnHold; State.OffHook ] false
+
+      fire Trigger.CallConnected
+
+      check [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
+
+      fire Trigger.PlacedOnHold
+      
+      check [ State.Connected; State.OnHold ] [State.Ringing; State.OffHook ] true
+
       fire Trigger.TakenOffHold
-      phoneCall.IsIn(State.Connected) |> should equal true
-      phoneCall.IsIn(State.OnHold) |> should equal false
-      
+
+      check [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
+
       fire Trigger.HungUp
-      phoneCall.IsIn(State.Connected) |> should equal false
-      phoneCall.State |> should equal State.OffHook
+
+      check [ State.OffHook; ] [State.Ringing; State.Connected; State.OnHold ] false
