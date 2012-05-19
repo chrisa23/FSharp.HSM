@@ -37,6 +37,7 @@
     <Compile Include="Bug.fs" />
     <Compile Include="PhoneCall.fs" />
     <None Include="packages.config" />
+    <Compile Include="TestHSM.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FsUnit.NUnit">

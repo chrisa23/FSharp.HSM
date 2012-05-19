@@ -5,78 +5,119 @@ open System.Collections.Generic
 //how do I make these internal?
 type Transition<'state,'event> = 
   { Event: 'event 
-    State: 'state
+    State: 'state 
     Guard: unit -> bool }
-    
+
+exception NoSuperState
+   
 type StateConfig<'state,'event> = 
   { State: 'state
     SuperState: 'state option
-    Entry: 'event -> unit
-    Exit: unit -> unit
+    AutoTransition: 'state option
+    Entry: unit -> unit//?? 'state -> 'event -> unit //old State first?
+    Exit: unit -> unit//?? 'state ->unit //newState
     Reentry: bool
     Transitions: Transition<'state,'event> list}
-
+    member this.hasSuper = match this.SuperState with
+                           | None -> false
+                           | Some _ -> true
+    member this.getSuper = match this.SuperState with
+                           | None -> raise NoSuperState
+                           | Some x -> x
 exception NoTransition
 
 type StateMachine<'state,'event when 'state : equality and 'event :equality>(states:StateConfig<'state,'event> list ) = 
-    let isSub state = 
-      match state.SuperState with
-      | None -> false
-      | Some _ -> true
-    let isSuper state subState = 
-      match subState.SuperState with
-      | None -> false
-      | Some x -> x = state
-    let mutable current = states.Head.State
+    let mutable current = Unchecked.defaultof<'state>
     let find state = states |> List.find (fun x -> x.State = state)
-    let stateEvent = new Event<'state>()
-    member this.State with get() = current
-    member this.StateChanged = stateEvent.Publish
-    member this.IsIn (state:'state) = current = state || isSuper state (find current) 
-    member this.Fire event = 
-        let cur = find current
-        let mutable trans = Unchecked.defaultof<Transition<'state,'event>>
-        match cur.Transitions |> List.tryFind (fun x -> x.Event = event) with
+    let rec findTransition event state = 
+        match state.Transitions |> List.tryFind (fun x -> x.Event = event) with
         | None -> 
-            match cur.SuperState with //do we have a superstate?
+            match state.SuperState with //do we have a superstate?
             | None -> raise NoTransition//error
-            | Some x -> trans <- (find x).Transitions |> List.find (fun x -> x.Event = event)//error if not found
-        | Some x ->  trans <- x
-        if trans.Guard() then 
-            let newCur = trans.State
-            let newState = states |> List.find (fun x -> x.State = newCur)
-            let isSelf = cur.State = newState.State
-            let moveToSub = isSuper cur.State newState
-            let curIsSub = isSub cur 
-            let newIsSuper = isSuper newState.State cur 
+            | Some x -> findTransition event (find x)
+        | Some x ->   x
+    let stateEvent = new Event<'state>()
+    let rec transition currentState newState = 
+      let currentStateConfig = find currentState
+      let newStateConfig = states |> List.find (fun x -> x.State = newState)
 
-            if (not(moveToSub) && not(isSelf)) 
-                || (isSelf && cur.Reentry)  then  
-                cur.Exit()
-            //but exit of super if sub -> not super
+      let isSelf = currentStateConfig.State = newStateConfig.State
+      let moveToSub = newStateConfig.hasSuper && newStateConfig.getSuper = currentStateConfig.State
+      let curIsSub = currentStateConfig.hasSuper
+      let shareSuper = currentStateConfig.hasSuper && newStateConfig.hasSuper && currentStateConfig.getSuper =  newStateConfig.getSuper
+      let newIsSuper = currentStateConfig.hasSuper && currentStateConfig.getSuper = newStateConfig.State
+
+      let rec exitSuper state = 
+        match state.SuperState with
+        | None -> ()
+        | Some super -> 
+            let superConfig = find super
+            superConfig.Exit()
+            exitSuper superConfig
+      let mutable calledExit = false
+//EXITS
+      if (not moveToSub && not isSelf) 
+          || (isSelf && currentStateConfig.Reentry)  
+      then  
+          currentStateConfig.Exit()
+          calledExit <- true
+
+      //todo:  fix enter/exit logic...
+
+            //do we need to call exit up the chain?
             //if we are in a substate and not transition to super
             //call the super's exit
-            if not(newIsSuper) && curIsSub then
-                match cur.SuperState with
-                | None -> ()
-                | Some super -> (find super).Exit()                    
+      if curIsSub && not shareSuper then//   //broke for multiple hierarchies
+      //are we leaving any substate 
+          exitSuper currentStateConfig         
 
-            //if not transition from sub to super
-            if (not(newIsSuper) && not(isSelf)) 
-               || (isSelf && cur.Reentry)  then 
-                newState.Entry(event)
 
-            current <- newCur
-            stateEvent.Trigger current
-    //member this.PermittedEvents ?  //collect transitions and any superstate transitions...
+//ENTRY
+      //if not transition from sub to super
+      if (not(newIsSuper) && not(isSelf)) 
+         || (isSelf && currentStateConfig.Reentry)  then 
+          newStateConfig.Entry()
+
+      current <- newState
+      stateEvent.Trigger current
+//
+      match newStateConfig.AutoTransition with
+      | None -> ()
+      | Some x -> transition newState x
+
+
+
+    member this.Init state = 
+        current <- state
+        let stateConfig = find current
+        stateConfig.Entry()
+        stateEvent.Trigger current
+        //if not started, transition to init state, calling Enter
+        match stateConfig.AutoTransition with
+        | None -> ()
+        | Some x -> transition state x
+    member this.State with get() = current
+    member this.StateChanged = stateEvent.Publish
+    member this.IsIn (state:'state) = 
+      if current = state then true else
+        let cur = find current
+        cur.hasSuper && cur.getSuper = state
+    member this.Fire event = 
+        let cur = find current
+        let trans = findTransition event cur
+        if trans.Guard() then transition current trans.State
 
 let configure state = 
-  { State = state; SuperState = None; Entry = (fun _ -> ()); Exit = (fun _ -> ()); Reentry = false; Transitions = [] }
+  { State = state; SuperState = None; Entry = (fun _ -> ()); Exit = (fun _ -> ()); 
+    Reentry = false; AutoTransition = None; Transitions = [] }
+
+let guard f state = { state with Guard = f }
+
+let transitionTo substate state = { state with AutoTransition = Some(substate) }
 
 let substateOf superState state = { state with SuperState = Some(superState) }
-  
-let onEntry f state = {state with Entry = (fun _ -> f()) }
-let onEntryFrom prevState f state = {state with Entry = (fun x -> f(x)) }
+
+let onEntry (f: unit->unit) state = {state with Entry = f }
 
 let onExit f state = {state with Exit = f }
 
@@ -85,12 +126,17 @@ let permit event endState state =
 
 let permitIf event endState guard state = { state with Transitions = { Event = event;State = endState; Guard = guard }::state.Transitions }
 
+//let on event state
+//let onIf event state
+
 let permitReentry event state = 
   { state with Reentry = true; Transitions = { Event = event; State = state.State; Guard = (fun _ -> true) }::state.Transitions }
 
 let permitReentryIf event guard state = 
   { state with Reentry = true; Transitions = { Event = event; State = state.State; Guard = guard }::state.Transitions }
 
+
 //todo:
 //ignore
 //unhandled handler
+//todo: implement action on transition with guard
