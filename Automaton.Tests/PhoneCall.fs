@@ -1,9 +1,12 @@
 ﻿namespace AutomatonTests  
 
-module PhoneCall =
-    open Automaton
-    open System
+open Automaton
+open System
+open NUnit.Framework
+open FsUnit
 
+module PhoneCallTest =
+    
     type State = 
      | OffHook
      | Ringing
@@ -25,63 +28,90 @@ module PhoneCall =
       printfn "%A ended" DateTime.Now
       timerOn <- false
 
-    let phoneCall = 
+    let newPhoneCall() = 
       new StateMachine<State,Trigger>(
           [ configure State.OffHook
               |> permit Trigger.CallDialed State.Ringing
             configure State.Ringing
               |> permit Trigger.CallConnected State.Connected
             configure State.Connected
-              |> permit Trigger.PlacedOnHold State.OnHold
-              |> permit Trigger.HungUp State.OffHook
               |> onEntry (fun _ -> startTimer())
               |> onExit (fun _ -> stopTimer())
+              |> permit Trigger.PlacedOnHold State.OnHold
+              |> permit Trigger.HungUp State.OffHook
             configure State.OnHold
               |> substateOf State.Connected
               |> permit Trigger.TakenOffHold State.Connected ] )
 
     let showState state = printfn "%A" state
-    phoneCall.StateChanged.Add showState
-    
-    let fire trigger = phoneCall.Fire trigger
-    
-    open NUnit.Framework
-    open FsUnit
-    
-    let isInState state = phoneCall.IsIn state |> should equal true
-    let isNotInState state = phoneCall.IsIn state |> should equal false
+   
+    let fire (phoneCall:StateMachine<State,Trigger>) trigger = phoneCall.Fire trigger
 
-    let check trueStates falseStates (timer: bool) = 
+    let attachShow (phoneCall:StateMachine<State,Trigger>) = phoneCall.StateChanged.Add showState
+
+    let isInState (phoneCall:StateMachine<State,Trigger>) state = phoneCall.IsIn state |> should equal true
+    let isNotInState (phoneCall:StateMachine<State,Trigger>) state = phoneCall.IsIn state |> should equal false
+
+    let check phoneCall trueStates falseStates (timer: bool) = 
         timerOn |> should equal timer
-        trueStates |> List.iter isInState
-        falseStates |> List.iter isNotInState
+        trueStates |> List.iter (isInState phoneCall)
+        falseStates |> List.iter (isNotInState phoneCall)
 
     [<Test>]
-    let ``Call``() =
+    let ``Dial -> Connect -> HangUp``() =
+      let call = newPhoneCall()
+      attachShow call
 
-      fire Trigger.CallDialed
-      check [ State.Ringing ] [State.Connected; State.OnHold; State.OffHook ] false
+      fire call Trigger.CallDialed
+      check call [ State.Ringing ] [State.Connected; State.OnHold; State.OffHook ] false
       
-      fire Trigger.CallConnected
-      check [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
+      fire call Trigger.CallConnected
+      check call [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
+
+      fire call Trigger.HungUp
+      check call [ State.OffHook; ] [State.Ringing; State.Connected; State.OnHold ] false
+
+
+    [<Test>]
+    let ``Dial -> Connect -> Hold -> HangUp``() =
+      let call = newPhoneCall()
+      attachShow call
+
+      fire call Trigger.CallDialed
+      check call [ State.Ringing ] [State.Connected; State.OnHold; State.OffHook ] false
       
-      fire Trigger.PlacedOnHold
-      check [ State.Connected; State.OnHold ] [State.Ringing; State.OffHook ] true
+      fire call Trigger.CallConnected
+      check call [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
       
-      fire Trigger.HungUp//i should be able to hang up here based on Connected state
-      check [ State.OffHook; ] [State.Ringing; State.Connected; State.OnHold ] false
+      fire call Trigger.PlacedOnHold
+      check call [ State.Connected; State.OnHold ] [State.Ringing; State.OffHook ] true
       
-      fire Trigger.CallDialed
-      check [ State.Ringing ] [State.Connected; State.OnHold; State.OffHook ] false
+      fire call Trigger.HungUp//i should be able to hang up here based on Connected state
+      check call [ State.OffHook; ] [State.Ringing; State.Connected; State.OnHold ] false
 
-      fire Trigger.CallConnected
-      check [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
+    [<Test>]
+    let ``Dial -> Connect -> Hold -> UnHold -> HangUp``() =      
+      let call = newPhoneCall()
+      attachShow call
 
-      fire Trigger.PlacedOnHold
-      check [ State.Connected; State.OnHold ] [State.Ringing; State.OffHook ] true
+      fire call Trigger.CallDialed
+      check call [ State.Ringing ] [State.Connected; State.OnHold; State.OffHook ] false
 
-      fire Trigger.TakenOffHold
-      check [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
+      fire call Trigger.CallConnected
+      check call [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
 
-      fire Trigger.HungUp
-      check [ State.OffHook; ] [State.Ringing; State.Connected; State.OnHold ] false
+      fire call Trigger.PlacedOnHold
+      check call [ State.Connected; State.OnHold ] [State.Ringing; State.OffHook ] true
+
+      fire call Trigger.TakenOffHold
+      check call [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
+
+      fire call Trigger.HungUp
+      check call [ State.OffHook; ] [State.Ringing; State.Connected; State.OnHold ] false
+
+    [<Test; ExpectedException(typeof<NoTransition>)>]
+    let ``Hold -> error``() =      
+      let call = newPhoneCall()
+      attachShow call
+      fire call Trigger.PlacedOnHold
+      

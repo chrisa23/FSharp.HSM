@@ -2,12 +2,13 @@
 
 open System.Collections.Generic
 
+//how do I make these internal?
 type Transition<'state,'event> = 
-  { Trigger: 'event 
+  { Event: 'event 
     State: 'state
     Guard: unit -> bool }
     
-type State<'state,'event> = 
+type StateConfig<'state,'event> = 
   { State: 'state
     SuperState: 'state option
     Entry: 'event -> unit
@@ -17,42 +18,37 @@ type State<'state,'event> =
 
 exception NoTransition
 
-let isSub state = 
-  match state.SuperState with
-  | None -> false
-  | Some _ -> true
-
-let isSuper super state = 
-  match super.SuperState with
-  | None -> false
-  | Some x -> x = state
-
-type StateMachine<'state,'event when 'state : equality and 'event :equality>(states:State<'state,'event> list ) = 
+type StateMachine<'state,'event when 'state : equality and 'event :equality>(states:StateConfig<'state,'event> list ) = 
+    let isSub state = 
+      match state.SuperState with
+      | None -> false
+      | Some _ -> true
+    let isSuper state subState = 
+      match subState.SuperState with
+      | None -> false
+      | Some x -> x = state
     let mutable current = states.Head.State
     let find state = states |> List.find (fun x -> x.State = state)
     let stateEvent = new Event<'state>()
     member this.State with get() = current
     member this.StateChanged = stateEvent.Publish
-    member this.IsIn (state:'state) = current = state || isSuper (find current) state 
-    member this.Fire(trigger)= 
+    member this.IsIn (state:'state) = current = state || isSuper state (find current) 
+    member this.Fire event = 
         let cur = find current
         let mutable trans = Unchecked.defaultof<Transition<'state,'event>>
-        match cur.Transitions |> List.tryFind (fun x -> x.Trigger = trigger) with
+        match cur.Transitions |> List.tryFind (fun x -> x.Event = event) with
         | None -> 
-            match cur.SuperState with 
+            match cur.SuperState with //do we have a superstate?
             | None -> raise NoTransition//error
-            | Some x -> trans <- (find x).Transitions  |> List.find (fun x -> x.Trigger = trigger)//do we have a superstate?
+            | Some x -> trans <- (find x).Transitions |> List.find (fun x -> x.Event = event)//error if not found
         | Some x ->  trans <- x
-
         if trans.Guard() then 
             let newCur = trans.State
             let newState = states |> List.find (fun x -> x.State = newCur)
-        
-            // transition from super to substate
             let isSelf = cur.State = newState.State
-            let moveToSub = isSuper newState cur.State
+            let moveToSub = isSuper cur.State newState
             let curIsSub = isSub cur 
-            let newIsSuper = isSuper cur newState.State
+            let newIsSuper = isSuper newState.State cur 
 
             if (not(moveToSub) && not(isSelf)) 
                 || (isSelf && cur.Reentry)  then  
@@ -68,11 +64,11 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
             //if not transition from sub to super
             if (not(newIsSuper) && not(isSelf)) 
                || (isSelf && cur.Reentry)  then 
-                newState.Entry(trigger)
+                newState.Entry(event)
 
             current <- newCur
             stateEvent.Trigger current
-    //member this.PermittedEvents ?
+    //member this.PermittedEvents ?  //collect transitions and any superstate transitions...
 
 let configure state = 
   { State = state; SuperState = None; Entry = (fun _ -> ()); Exit = (fun _ -> ()); Reentry = false; Transitions = [] }
@@ -84,17 +80,17 @@ let onEntryFrom prevState f state = {state with Entry = (fun x -> f(x)) }
 
 let onExit f state = {state with Exit = f }
 
-let permit trigger endState state =
-  { state with Transitions = { Trigger = trigger; State = endState; Guard = (fun _ -> true) }::state.Transitions }
+let permit event endState state =
+  { state with Transitions = { Event = event; State = endState; Guard = (fun _ -> true) }::state.Transitions }
 
-let permitIf trigger endState guard state = { state with Transitions = { Trigger = trigger;State = endState; Guard = guard }::state.Transitions }
+let permitIf event endState guard state = { state with Transitions = { Event = event;State = endState; Guard = guard }::state.Transitions }
 
-let permitReentry trigger state = 
-  { state with Reentry = true; Transitions = { Trigger = trigger; State = state.State; Guard = (fun _ -> true) }::state.Transitions }
+let permitReentry event state = 
+  { state with Reentry = true; Transitions = { Event = event; State = state.State; Guard = (fun _ -> true) }::state.Transitions }
 
-let permitReentryIf trigger guard state = 
-  { state with Reentry = true; Transitions = { Trigger = trigger; State = state.State; Guard = guard }::state.Transitions }
+let permitReentryIf event guard state = 
+  { state with Reentry = true; Transitions = { Event = event; State = state.State; Guard = guard }::state.Transitions }
+
 //todo:
-//permitReentry?
 //ignore
-
+//unhandled handler
