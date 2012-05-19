@@ -33,46 +33,46 @@ module TestHSM =
               |> onEntry (fun _ -> printfn "Enter S0")
               |> onExit (fun _ -> printfn "Exit S0")
               |> transitionTo S1
-              |> permit E S211
+              |> on E S211
             configure S1
               |> onEntry (fun _ -> printfn "Enter S1")
               |> onExit (fun _ -> printfn "Exit S1")
               |> substateOf S0
               |> transitionTo S11
-              |> permit A S1 
-              |> permit B S11
-              |> permit C S211 
-              |> permit D S0 
-              |> permit F S211 
+              |> on A S1 
+              |> on B S11
+              |> on C S211 
+              |> on D S0 
+              |> on F S211 
             configure S11
               |> onEntry (fun _ -> printfn "Enter S11")
               |> onExit (fun _ -> printfn "Exit S11")
               |> substateOf S1
-              |> permit G S211 
+              |> on G S211 
               //|> onEntry (fun _ -> foo <- false)
               //onIf H guard function
             configure S2
               |> onEntry (fun _ -> printfn "Enter S2")
               |> onExit (fun _ -> printfn "Exit S2")
               |> substateOf S0
-              |> permit C S1 
-              |> permit F S11 
+              |> on C S1 
+              |> on F S11 
             configure S21
               |> onEntry (fun _ -> printfn "Enter S21")
               |> onExit (fun _ -> printfn "Exit S21")
               |> substateOf S2
-              |> permit B S211 
-              |> permitIf H S21 (fun _ -> not foo)
+              |> on B S211 
+              |> onIf H (fun _ -> not foo) S21 
             configure S211
               |> onEntry (fun _ -> printfn "Enter S211")
               |> onExit (fun _ -> printfn "Exit S211")
               |> substateOf S21
-              |> permit D S21
-              |> permit G S0 ] ) 
+              |> on D S21
+              |> on G S0 ] ) 
 
     let fire (hsm:StateMachine<State,Sig>) signal = 
         printfn "fire %A" signal
-        hsm.Fire signal
+        hsm.Fire(signal)
 
     [<Test>]
     let HsmTest() = 

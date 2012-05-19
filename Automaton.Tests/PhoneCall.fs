@@ -32,31 +32,31 @@ module PhoneCallTest =
     let newPhoneCall() = 
       new StateMachine<State,Trigger>(
           [ configure OffHook
-              |> permit CallDialed Ringing
+              |> on CallDialed Ringing
             configure Ringing
-              |> permit CallConnected Connected
+              |> on CallConnected Connected
             configure Connected
               |> onEntry (fun _ -> startTimer())
               |> onExit (fun _ -> stopTimer())
               |> transitionTo InCall
-              |> permit HungUp OffHook
+              |> on HungUp OffHook
             configure InCall
               |> substateOf Connected
-              |> permit PlacedOnHold OnHold
+              |> on PlacedOnHold OnHold
             configure OnHold
               |> substateOf Connected
-              |> permit TakenOffHold InCall ] )
+              |> on TakenOffHold InCall ] )
 
     let showState state = printfn "%A" state
    
-    let fire (phoneCall:StateMachine<State,Trigger>) trigger = 
+    let fire (phoneCall:StateMachine<State, Trigger>) trigger = 
       printfn "fire %A" trigger
       phoneCall.Fire trigger
 
-    let attachShow (phoneCall:StateMachine<State,Trigger>) = phoneCall.StateChanged.Add showState
+    let attachShow (phoneCall:StateMachine<State, Trigger>) = phoneCall.StateChanged.Add showState
 
-    let isInState (phoneCall:StateMachine<State,Trigger>) state = phoneCall.IsIn state |> should equal true
-    let isNotInState (phoneCall:StateMachine<State,Trigger>) state = phoneCall.IsIn state |> should equal false
+    let isInState (phoneCall:StateMachine<State, Trigger>) state = phoneCall.IsIn state |> should equal true
+    let isNotInState (phoneCall:StateMachine<State, Trigger>) state = phoneCall.IsIn state |> should equal false
 
     let check phoneCall trueStates falseStates (timer: bool) = 
         timerOn |> should equal timer
@@ -92,7 +92,8 @@ module PhoneCallTest =
       fire call PlacedOnHold
       check call [ Connected; OnHold ] [Ringing; OffHook; InCall ] true
       
-      fire call HungUp//i should be able to hang up here based on Connected state
+      //i should be able to hang up here based on Connected state
+      fire call HungUp
       check call [ OffHook; ] [Ringing; Connected; OnHold; InCall ] false
 
     [<Test>]
