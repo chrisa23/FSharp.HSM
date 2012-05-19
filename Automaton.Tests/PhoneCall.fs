@@ -48,48 +48,40 @@ module PhoneCall =
     open NUnit.Framework
     open FsUnit
     
-    let check trueStates falseStates  (timer: bool) = 
+    let isInState state = phoneCall.IsIn state |> should equal true
+    let isNotInState state = phoneCall.IsIn state |> should equal false
+
+    let check trueStates falseStates (timer: bool) = 
         timerOn |> should equal timer
-        trueStates |> List.iter (fun x ->
-           phoneCall.IsIn x |> should equal true)
-        falseStates |> List.iter (fun x ->
-           phoneCall.IsIn x |> should equal false)
+        trueStates |> List.iter isInState
+        falseStates |> List.iter isNotInState
 
     [<Test>]
     let ``Call``() =
 
       fire Trigger.CallDialed
-      
       check [ State.Ringing ] [State.Connected; State.OnHold; State.OffHook ] false
       
       fire Trigger.CallConnected
-      
       check [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
       
       fire Trigger.PlacedOnHold
-
       check [ State.Connected; State.OnHold ] [State.Ringing; State.OffHook ] true
       
       fire Trigger.HungUp//i should be able to hang up here based on Connected state
-
       check [ State.OffHook; ] [State.Ringing; State.Connected; State.OnHold ] false
       
       fire Trigger.CallDialed
-
       check [ State.Ringing ] [State.Connected; State.OnHold; State.OffHook ] false
 
       fire Trigger.CallConnected
-
       check [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
 
       fire Trigger.PlacedOnHold
-      
       check [ State.Connected; State.OnHold ] [State.Ringing; State.OffHook ] true
 
       fire Trigger.TakenOffHold
-
       check [ State.Connected ] [State.Ringing; State.OnHold; State.OffHook ] true
 
       fire Trigger.HungUp
-
       check [ State.OffHook; ] [State.Ringing; State.Connected; State.OnHold ] false

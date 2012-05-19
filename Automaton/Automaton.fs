@@ -25,7 +25,7 @@ let isSub state =
 let isSuper super state = 
   match super.SuperState with
   | None -> false
-  | Some x -> x = state.State
+  | Some x -> x = state
 
 type StateMachine<'state,'event when 'state : equality and 'event :equality>(states:State<'state,'event> list ) = 
     let mutable current = states.Head.State
@@ -33,11 +33,7 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
     let stateEvent = new Event<'state>()
     member this.State with get() = current
     member this.StateChanged = stateEvent.Publish
-    member this.IsIn (state:'state) = 
-        if current = state then true
-        else match (find current).SuperState with
-             | None -> false
-             | Some x -> x = state
+    member this.IsIn (state:'state) = current = state || isSuper (find current) state 
     member this.Fire(trigger)= 
         let cur = find current
         let mutable trans = Unchecked.defaultof<Transition<'state,'event>>
@@ -54,9 +50,9 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
         
             // transition from super to substate
             let isSelf = cur.State = newState.State
-            let moveToSub = isSuper newState cur
+            let moveToSub = isSuper newState cur.State
             let curIsSub = isSub cur 
-            let newIsSuper = isSuper cur newState
+            let newIsSuper = isSuper cur newState.State
 
             if (not(moveToSub) && not(isSelf)) 
                 || (isSelf && cur.Reentry)  then  
