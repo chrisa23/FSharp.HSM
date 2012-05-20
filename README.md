@@ -3,20 +3,20 @@ FSharp.HSM
 
 Hierarchical State Machine library in F#
 
-Inspired by stateless (http://code.google.com/p/stateless/), http://accu.org/index.php/journals/252
+Inspired by http://code.google.com/p/stateless/, http://accu.org/index.php/journals/252
 
 Examples:
 
 <pre>
 Phone call:
-    new StateMachine< State,Trigger> (
+    new StateMachine < State,Trigger > (
         [ configure OffHook
             |> on CallDialed Ringing
           configure Ringing
             |> on CallConnected Connected
           configure Connected
-            |> onEntry (fun _ -> startTimer())
-            |> onExit (fun _ -> stopTimer())
+            |> onEntry startTimer
+            |> onExit stopTimer
             |> transitionTo InCall
             |> on HungUp OffHook
           configure InCall
@@ -51,7 +51,7 @@ Complex HSM:
             |> substateOf S2
             |> transitionTo S211
             |> on B S211 
-            |> handleIf H ifNotFoo (fun x y -> setFooTrue(); S21 )
+            |> handleIf H ifNotFoo (fun _ _ -> setFooTrue(); S21 )
           configure S211
             |> substateOf S21
             |> on D S21

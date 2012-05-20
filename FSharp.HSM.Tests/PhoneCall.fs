@@ -35,8 +35,8 @@ let newPhoneCall() =
           configure Ringing
             |> on CallConnected Connected
           configure Connected
-            |> onEntry (fun _ -> startTimer())
-            |> onExit (fun _ -> stopTimer())
+            |> onEntry startTimer
+            |> onExit stopTimer
             |> transitionTo InCall
             |> on HungUp OffHook
           configure InCall
