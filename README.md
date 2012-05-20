@@ -9,7 +9,7 @@ Examples:
 
 <pre>
 Phone call:
-    new StateMachine<State,Trigger>(
+    new StateMachine< State, Trigger >(
         [ configure OffHook
             |> on CallDialed Ringing
           configure Ringing
@@ -27,7 +27,7 @@ Phone call:
             |> on TakenOffHold InCall ] )
 
 Complex HSM:
-    new StateMachine<State,Sig>(
+    new StateMachine< State, Signal >(
         [ configure S0
             |> transitionTo S1
             |> on E S211
