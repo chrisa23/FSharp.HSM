@@ -1,8 +1,7 @@
-﻿module Automaton 
+﻿module FSharp.HSM 
 
 open System.Collections.Generic
 
-//how do I make these internal?
 type Transition<'state,'event> = 
   { Event: 'event 
     NextState: 'event -> obj -> 'state
@@ -21,7 +20,7 @@ type StateConfig<'state,'event> =
                            | None -> false
                            | Some _ -> true
     member this.getSuper = match this.SuperState with
-                           | None -> raise NoSuperState
+                           | None -> Unchecked.defaultof<'state>
                            | Some x -> x
 exception NoTransition
 exception AlreadyStarted
@@ -41,39 +40,61 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
       let newStateConfig = states |> List.find (fun x -> x.State = newState)
 
       let isSelf = currentStateConfig.State = newStateConfig.State
-      let moveToSub = newStateConfig.hasSuper && newStateConfig.getSuper = currentStateConfig.State
+      
       let curIsSub = currentStateConfig.hasSuper
-      let shareSuper = currentStateConfig.hasSuper && newStateConfig.hasSuper && currentStateConfig.getSuper =  newStateConfig.getSuper
-      let newIsSuper = currentStateConfig.hasSuper && currentStateConfig.getSuper = newStateConfig.State
 
-      let rec exitSuper state = 
+      let rec getParents list state =
+        let config = find state
+        if config.hasSuper then 
+          let super = config.getSuper
+          getParents (super::list) super
+        else list
+
+      //has common parent (which becomes limit on exit super)
+      //get parents in order.  first of lists to match.
+      let curParents = getParents [] currentState |> List.rev
+      let newParents = getParents [] newState |> List.rev
+      let commonParent = ref Unchecked.defaultof<'state>
+      //fix this 
+      let mutable foundParent = false
+      for parent in curParents do
+        if not foundParent && newParents |> List.exists (fun x -> x = parent) then
+          commonParent := parent
+          foundParent <- true//done...  STOP
+
+      let moveToSub = newParents |> List.exists (fun x -> x = currentState)
+
+      let shareSuper = !commonParent <> Unchecked.defaultof<'state>
+
+      let rec exitSuper state limit = 
         match state.SuperState with
         | None -> ()
         | Some super -> 
+          if limit <> Unchecked.defaultof<'state> && super = limit then ()
+          else 
             let superConfig = find super
             superConfig.Exit()
-            exitSuper superConfig
+            exitSuper superConfig limit 
 //EXITS
       if (not moveToSub && not isSelf) || isSelf then
         currentStateConfig.Exit()
 
-      //todo:  fix enter/exit logic...
-      //do we need to call exit up the chain?
-      //if we are in a substate and not transition to super
-      //call the super's exit
-      if curIsSub && not shareSuper then//   //broke for multiple hierarchies
-      //are we leaving any substate 
-          exitSuper currentStateConfig         
+      //exit super states up to but not common parent
+      exitSuper currentStateConfig !commonParent      
 
 //ENTRY
-      //if not transition from sub to super
-      if (not(newIsSuper) && not(isSelf)) 
-         || isSelf  then 
-          newStateConfig.Entry()
+//enter parents below common Parents before newState, but not if we just autoed from there..
+      if foundParent then
+        let revParents = newParents |> List.rev 
+        let index = revParents |> List.findIndex (fun x -> x = !commonParent)
+        for parent in revParents |> Seq.skip (index + 1) do
+          if parent <> currentState then (find parent).Entry()
+
+      newStateConfig.Entry()
 
       current <- newState
       stateEvent.Trigger current
-//
+
       match newStateConfig.AutoTransition with
       | None -> ()
       | Some x -> transition newState x
@@ -119,11 +140,8 @@ let handle event f state =
   { state with Transitions = { Event = event; NextState = f; Guard = (fun _ -> true) }::state.Transitions }
 let handleIf event guard f state = 
   { state with Transitions = { Event = event; NextState = f; Guard = guard }::state.Transitions }
-//let on event state
-//let onIf event state
 
 //todo:
 //ignore (? is this worthwhile?)
 //unhandled handler
 //implement action on transition with/wo guard
-//args...  ?? single data

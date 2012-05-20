@@ -10,7 +10,7 @@
     <RootNamespace>Automaton.Tests</RootNamespace>
     <AssemblyName>Automaton.Tests</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <Name>Automaton.Tests</Name>
+    <Name>FSharp.HSM.Tests</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -35,6 +35,7 @@
   <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
   <ItemGroup>
     <None Include="packages.config" />
+    <Compile Include="TestHelpers.fs" />
     <Compile Include="Bug.fs" />
     <Compile Include="TestHSM.fs" />
     <Compile Include="PhoneCall.fs" />
@@ -53,8 +54,10 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-    <ProjectReference Include="..\Automaton\Automaton.fsproj">
-      <Name>Automaton</Name>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Automaton\FSharp.HSM.fsproj">
+      <Name>FSharp.HSM</Name>
       <Project>{37d3e910-158a-479f-b0df-82f0ed4f1f7f}</Project>
       <Private>True</Private>
     </ProjectReference>

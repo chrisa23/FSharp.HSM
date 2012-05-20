@@ -1,6 +1,6 @@
 ﻿module Bug
 
-open Automaton
+open FSharp.HSM
 
 type State = 
  | Open

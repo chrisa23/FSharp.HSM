@@ -1,5 +1,5 @@
-Automaton
-=========
+FSharp.HSM
+==========
 
 Hierarchical State Machine library in F#
 
