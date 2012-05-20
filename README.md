@@ -7,6 +7,7 @@ Inspired by stateless (http://code.google.com/p/stateless/), http://accu.org/ind
 
 Examples:
 
+<pre>
 Phone call:
     new StateMachine<State,Trigger>(
         [ configure OffHook
@@ -66,4 +67,4 @@ Complex HSM:
             |> onExit (fun _ -> printfn "Exit S211")
             |> substateOf S21
             |> on D S21
-            |> on G S0 ] ) 
+            |> on G S0 ] ) </pre>
