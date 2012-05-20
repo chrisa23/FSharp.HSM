@@ -48,7 +48,7 @@ Complex HSM:
             |> onExit (fun _ -> printfn "Exit S11")
             |> substateOf S1
             |> on G S211 
-			|> actionIf h (fun _ -> foo) (fun _ -> foo <- false) //still todo
+			|> actionIf H ifFoo setFooFalse
           configure S2
             |> onEntry (fun _ -> printfn "Enter S2")
             |> onExit (fun _ -> printfn "Exit S2")
@@ -61,7 +61,7 @@ Complex HSM:
             |> substateOf S2
             |> transitionTo S211
             |> on B S211 
-            |> handleIf H (fun _ -> not foo) (fun x y -> foo <- true; S21 )
+            |> handleIf H ifNotFoo (fun x y -> setFooTrue(); S21 )
           configure S211
             |> onEntry (fun _ -> printfn "Enter S211")
             |> onExit (fun _ -> printfn "Exit S211")
