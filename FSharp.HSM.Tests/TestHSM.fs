@@ -74,6 +74,7 @@ let fire (hsm:StateMachine<State,Sig>) signal =
     printfn "fire %A" signal
     hsm.Fire(signal)
 
+//todo:  add checks for state, entry, exits...
 [<Test>]
 let HsmTest() = 
     let hsm = (new ComplexHSM()).Hsm

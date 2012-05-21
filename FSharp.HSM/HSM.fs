@@ -7,14 +7,12 @@ type Transition<'state,'event> =
   { Event: 'event 
     NextState: 'event -> obj -> 'state
     Guard: unit -> bool }
-    //Action: unit -> unit 
-    //ActionGuard: unit -> bool }
 
 exception NoSuperState
     
 type StateConfig<'state,'event> = 
   { State: 'state
-    SuperState: 'state option//possibly remove with Parents field
+    SuperState: 'state option
     AutoTransition: 'state option
     Entry: unit -> unit
     Exit: unit -> unit
@@ -55,7 +53,7 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
     
     let rec findTransition event state = 
       match state.Transitions |> List.tryFind (fun x -> x.Event = event), state.SuperState with
-      | None, None -> raise NoTransition//error
+      | None, None -> raise NoTransition
       | None, Some x -> findTransition event (find x)
       | Some x, _ -> x
     let stateEvent = new Event<'state>()
@@ -83,16 +81,12 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
       let newStateConfig = find newState
 
       let isSelf = currentStateConfig.State = newStateConfig.State
-
       //has common parent (which becomes limit on exit super)
       let commonParent = findCommon currentStateConfig.Parents newStateConfig.Parents 
-      let mutable foundParent = false
       let moveToSub = newStateConfig.Parents |> List.exists (fun x -> x = currentState)
    
 //EXITS
-      if (not moveToSub && not isSelf) || isSelf then
-        currentStateConfig.Exit()
-      
+      if (not moveToSub && not isSelf) || isSelf then currentStateConfig.Exit()
       //exit super states up to but not common parent
       exitSuper currentStateConfig commonParent
 
@@ -128,10 +122,7 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
       | None -> ()
       | Some x -> transition state x
     ///Gets the current state
-    member this.State 
-      with get() = 
-        if not started then raise NotInitialized
-        current
+    member this.State with get() = if not started then raise NotInitialized else current
     ///Raise on a state change
     member this.StateChanged = stateEvent.Publish
     ///Check whether in state or parent state
@@ -144,13 +135,11 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
       if not started then raise NotInitialized
       let cur = find current
       let trans = findTransition event cur
-      //if trans.ActionGuard() then trans.Action()
       if trans.Guard() then transition current (trans.NextState event null)
     ///Fire an event with data
     member this.Fire(event, data) = 
       let cur = find current
       let trans = findTransition event cur
-      //if trans.ActionGuard() then trans.Action()
       if trans.Guard() then transition current (trans.NextState event data)
 
 ///Sets up a new state config 
@@ -169,12 +158,10 @@ let substateOf superState state = { state with SuperState = Some(superState) }
 let transitionTo substate state = { state with AutoTransition = Some(substate) }
 ///Sets a transition to a new state on an event (same state allows re-entry)
 let on event endState state =
-  { state with Transitions = 
-    { Event = event; NextState = (fun _ _ -> endState); Guard = (fun _ -> true) }::state.Transitions }
+  { state with Transitions = { Event = event; NextState = (fun _ _ -> endState); Guard = (fun _ -> true) }::state.Transitions }
 ///Sets a guarded transition to a new state on an event (same state allows re-entry)
 let onIf event guard endState state = 
-  { state with Transitions = 
-    { Event = event; NextState = (fun _ _ -> endState); Guard = guard }::state.Transitions }
+  { state with Transitions = { Event = event; NextState = (fun _ _ -> endState); Guard = guard }::state.Transitions }
 ///Sets an event handler (with or without data) which returns the new state
 let handle event f state = 
   { state with Transitions = { Event = event; NextState = f; Guard = (fun _ -> true) }::state.Transitions }
@@ -182,15 +169,12 @@ let handle event f state =
 let handleIf event guard f state = 
   { state with Transitions = { Event = event; NextState = f; Guard = guard }::state.Transitions }
 
+
+//was adding actions based on Samek statechart example, but I don't think it is needed
+//handle and handleIf take the event and an arg but must return a new state
+
 ////Sets an action on an event (can't be set in addition to a current state transition)
 //let action event f state =
-////todo: find if we have a transition and update, if not, 
-//  { state with Transitions = 
-//    { Event = event; NextState = (fun _ _ -> state.State); Guard =  (fun _ -> false); 
-//      Action = f; ActionGuard = (fun _ -> true) }::state.Transitions }
-//
+
 ////Sets an action on an event
 //let actionIf event guard f state =
-//  { state with Transitions = 
-//    { Event = event; NextState = (fun _ _ -> state.State); Guard =  (fun _ -> false); 
-//      Action = f; ActionGuard = guard }::state.Transitions }
