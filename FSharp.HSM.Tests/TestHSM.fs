@@ -23,9 +23,9 @@ type Sig =
     | G
     | H
 
-let mutable foo = false
-
-let newComplexHSM() = 
+type ComplexHSM() = 
+  let mutable foo = false
+  let hsm = 
     new StateMachine<State,Sig>(
         [ configure S0
             |> onEntry (fun _ -> printfn "Enter S0")
@@ -47,9 +47,8 @@ let newComplexHSM() =
             |> onExit (fun _ -> printfn "Exit S11")
             |> substateOf S1
             |> on G S211 
-            //todo ?
-            //|> onEntry (fun _ -> foo <- false)
-            //onIf H guard function
+            //removing for now
+            //|> actionIf H (fun _ -> foo) (fun _ -> printfn "fooFal"; foo <- false;)
           configure S2
             |> onEntry (fun _ -> printfn "Enter S2")
             |> onExit (fun _ -> printfn "Exit S2")
@@ -62,13 +61,14 @@ let newComplexHSM() =
             |> substateOf S2
             |> transitionTo S211
             |> on B S211 
-            |> handleIf H (fun _ -> not foo) (fun x y -> foo <- true; S21 )
+            |> handleIf H (fun _ -> not foo) (fun _ _ -> printfn "fooTru"; foo <- true; S21 )
           configure S211
             |> onEntry (fun _ -> printfn "Enter S211")
             |> onExit (fun _ -> printfn "Exit S211")
             |> substateOf S21
             |> on D S21
             |> on G S0 ] ) 
+  member this.Hsm with get() = hsm
 
 let fire (hsm:StateMachine<State,Sig>) signal = 
     printfn "fire %A" signal
@@ -76,7 +76,7 @@ let fire (hsm:StateMachine<State,Sig>) signal =
 
 [<Test>]
 let HsmTest() = 
-    let hsm = newComplexHSM()
+    let hsm = (new ComplexHSM()).Hsm
     hsm.Init S0
     fire hsm A
     fire hsm E
@@ -90,5 +90,9 @@ let HsmTest() =
     //we should not exit S2 and S0 here... plus we should enter S21
     //foo should be set and not allow next transition...
     fire hsm H
+    fire hsm G
+    //not doing actions for now
+    //fire hsm H
+    //fire hsm H
 
       

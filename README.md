@@ -42,7 +42,6 @@ Complex HSM:
           configure S11
             |> substateOf S1
             |> on G S211 
-			|> actionIf H ifFoo setFooFalse
           configure S2
             |> substateOf S0
             |> on C S1 
