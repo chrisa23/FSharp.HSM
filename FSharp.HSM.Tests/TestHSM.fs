@@ -28,13 +28,13 @@ type ComplexHSM() =
   let hsm = 
     new StateMachine<State,Sig>(
         [ configure S0
-            |> onEntry (fun _ -> printfn "Enter S0")
-            |> onExit (fun _ -> printfn "Exit S0")
+            |> onEntry (fun () -> printfn "Enter S0")
+            |> onExit (fun () -> printfn "Exit S0")
             |> transitionTo S1
             |> on E S211
           configure S1
-            |> onEntry (fun _ -> printfn "Enter S1")
-            |> onExit (fun _ -> printfn "Exit S1")
+            |> onEntry (fun () -> printfn "Enter S1")
+            |> onExit (fun () -> printfn "Exit S1")
             |> substateOf S0
             |> transitionTo S11
             |> on A S1 
@@ -43,28 +43,27 @@ type ComplexHSM() =
             |> on D S0 
             |> on F S211 
           configure S11
-            |> onEntry (fun _ -> printfn "Enter S11")
-            |> onExit (fun _ -> printfn "Exit S11")
+            |> onEntry (fun () -> printfn "Enter S11")
+            |> onExit (fun () -> printfn "Exit S11")
             |> substateOf S1
             |> on G S211 
-            //removing for now
-            //|> actionIf H (fun _ -> foo) (fun _ -> printfn "fooFal"; foo <- false;)
+            |> handleIf H (fun () -> foo) (fun event arg -> printfn "fooFal"; foo <- false; S11)
           configure S2
-            |> onEntry (fun _ -> printfn "Enter S2")
-            |> onExit (fun _ -> printfn "Exit S2")
+            |> onEntry (fun () -> printfn "Enter S2")
+            |> onExit (fun () -> printfn "Exit S2")
             |> substateOf S0
             |> on C S1 
             |> on F S11 
           configure S21
-            |> onEntry (fun _ -> printfn "Enter S21")
-            |> onExit (fun _ -> printfn "Exit S21")
+            |> onEntry (fun () -> printfn "Enter S21")
+            |> onExit (fun () -> printfn "Exit S21")
             |> substateOf S2
             |> transitionTo S211
             |> on B S211 
-            |> handleIf H (fun _ -> not foo) (fun _ _ -> printfn "fooTru"; foo <- true; S21 )
+            |> handleIf H (fun () -> not foo) (fun event arg -> printfn "fooTru"; foo <- true; S21 )
           configure S211
-            |> onEntry (fun _ -> printfn "Enter S211")
-            |> onExit (fun _ -> printfn "Exit S211")
+            |> onEntry (fun () -> printfn "Enter S211")
+            |> onExit (fun () -> printfn "Exit S211")
             |> substateOf S21
             |> on D S21
             |> on G S0 ] ) 
@@ -80,6 +79,7 @@ let HsmTest() =
     let hsm = (new ComplexHSM()).Hsm
     hsm.Init S0
     fire hsm A
+    fire hsm H
     fire hsm E
     fire hsm E
     //error
@@ -95,5 +95,7 @@ let HsmTest() =
     //not doing actions for now
     //fire hsm H
     //fire hsm H
+    fire hsm A
+    fire hsm H
 
       
