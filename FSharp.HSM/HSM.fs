@@ -29,16 +29,16 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
     let stateTable = SymbolTable states
     let configs = stateTable.Dictionary()
     let find state : StateConfig<'state,'event> = configs.[stateTable.Get state]
-    
-    let rec getParents states (list:'state list) (state:'state) =
-      let currentConfig = states |> List.find (fun x -> x.State = state)
+    let rec getParents results state =
+      let currentConfig = stateList |> List.find (fun x -> x.State = state)
       if Option.isSome currentConfig.SuperState then 
         let super = Option.get currentConfig.SuperState
-        getParents states (super::list) super
-      else list |> List.rev
+        getParents (super::results) super
+      else results |> List.rev
 
     do 
-      stateList |> List.iter (fun x -> configs.[stateTable.Get x.State] <- { x with Parents = getParents stateList [] x.State } )
+      for stateConfig in stateList do
+        configs.[stateTable.Get stateConfig.State] <- { stateConfig with Parents = getParents [] stateConfig.State }
     
     let rec findTransition event state = 
       match state.Transitions |> List.tryFind (fun x -> x.Event = event), state.SuperState with
@@ -58,9 +58,8 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
 
     let rec findCommon (list1:'state list) list2 = 
         if list1.IsEmpty then None else
-        let toCheck = list1.Head
         let restOfList1 = list1.Tail
-        match list2 |> List.tryFind (fun x -> x = toCheck), restOfList1 with
+        match list2 |> List.tryFind (fun x -> x = list1.Head), restOfList1 with
         | None, [] -> None
         | None, _ -> findCommon restOfList1 list2
         | Some x, _ -> Some(x)
@@ -70,18 +69,19 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
       let newStateConfig = find newState
 
       let isSelf = currentStateConfig.State = newStateConfig.State
-      let moveToSub = newStateConfig.Parents |> List.exists (fun x -> x = currentState)
-      let commonParent = findCommon currentStateConfig.Parents newStateConfig.Parents 
+      let moveToSub = not isSelf || newStateConfig.Parents |> List.exists (fun x -> x = currentState)
+      let commonParent = if isSelf then None else findCommon currentStateConfig.Parents newStateConfig.Parents 
          
-      if (not moveToSub && not isSelf) || isSelf then 
+      if not moveToSub || isSelf then 
         currentStateConfig.Exit()
+
       exitToCommonParent currentStateConfig commonParent
 
       //enter parents below common Parents before newState, 
       //but not if we just autoed from there..
       match commonParent with
       | None -> ()
-      | Some x -> 
+      | Some x -> //todo: optimize this
           let revParents = newStateConfig.Parents |> List.rev 
           let index = revParents |> List.findIndex (fun y -> y = x)
           for parent in revParents |> Seq.skip (index + 1) do
@@ -97,8 +97,7 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
 
     ///Initializes the state machine with its initial state
     member this.Init state = 
-      if started then raise AlreadyStarted
-      started <- true
+      if started then raise AlreadyStarted else started <- true
       let stateConfig = find state
       current <- state
       stateConfig.Entry()
@@ -141,16 +140,20 @@ let substateOf superState state = { state with SuperState = Some(superState) }
 let transitionTo substate state = { state with AutoTransition = Some(substate) }
 ///Sets a transition to a new state on an event (same state allows re-entry)
 let on event endState state =
-  { state with Transitions = { Event = event; NextState = (fun _ _ -> endState); Guard = (fun () -> true) }::state.Transitions }
+  { state with Transitions = 
+    { Event = event; NextState = (fun _ _ -> endState); Guard = (fun () -> true) }::state.Transitions }
 ///Sets a guarded transition to a new state on an event (same state allows re-entry)
 let onIf event guard endState state = 
-  { state with Transitions = { Event = event; NextState = (fun _ _ -> endState); Guard = guard }::state.Transitions }
+  { state with Transitions = 
+    { Event = event; NextState = (fun _ _ -> endState); Guard = guard }::state.Transitions }
 ///Sets an event handler (with or without data) which returns the new state to transition to
 let handle event f state = 
-  { state with Transitions = { Event = event; NextState = f; Guard = (fun () -> true) }::state.Transitions }
+  { state with Transitions = 
+    { Event = event; NextState = f; Guard = (fun () -> true) }::state.Transitions }
 ///Sets a guarded event handler (with or without data) which returns the new state
 let handleIf event guard f state = 
-  { state with Transitions = { Event = event; NextState = f; Guard = guard }::state.Transitions }
+  { state with Transitions = 
+    { Event = event; NextState = f; Guard = guard }::state.Transitions }
 
 
 //was adding actions based on Samek statechart example, but I don't think it is needed
