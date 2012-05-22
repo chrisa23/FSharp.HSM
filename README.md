@@ -7,8 +7,9 @@ Inspired by http://code.google.com/p/stateless/, http://accu.org/index.php/journ
 
 Examples:
 
-<pre>
+
 Phone call:
+
     new StateMachine < State , Trigger > (
         [ configure OffHook
             |> on CallDialed Ringing
@@ -27,6 +28,7 @@ Phone call:
             |> on TakenOffHold InCall ] )
 
 Complex HSM:
+
     new StateMachine < State , Signal > (
         [ configure S0
             |> transitionTo S1
@@ -55,4 +57,4 @@ Complex HSM:
           configure S211
             |> substateOf S21
             |> on D S21
-            |> on G S0 ] ) </pre>
+            |> on G S0 ] )
