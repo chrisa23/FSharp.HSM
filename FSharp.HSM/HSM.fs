@@ -1,9 +1,7 @@
 ﻿module FSharp.HSM 
 
-open System.Collections.Generic
 open SymbolTables
 
-exception NoSuperState
 exception NoTransition
 exception NotInitialized
 exception AlreadyStarted
@@ -160,13 +158,3 @@ let handle event f state =
 let handleIf event guard f state = 
   { state with Transitions = 
     { Event = event; NextState = f; Guard = guard }::state.Transitions }
-
-
-//was adding actions based on Samek statechart example, but I don't think it is needed
-//handle and handleIf take the event and an arg but must return a new state
-
-////Sets an action on an event (can't be set in addition to a current state transition)
-//let action event f state =
-
-////Sets an action on an event
-//let actionIf event guard f state =
