@@ -10,7 +10,7 @@ exception AlreadyStarted
 
 type Transition<'state,'event> = 
   { Event: 'event 
-    NextState: 'event -> obj -> 'state
+    NextState: 'event -> obj -> 'state option
     Guard: unit -> bool }
     
 type StateConfig<'state,'event> = 
@@ -119,12 +119,18 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
       if not started then raise NotInitialized
       let cur = find current
       let trans = findTransition event cur
-      if trans.Guard() then transition current (trans.NextState event null)
+      if trans.Guard() then 
+        let nextState = trans.NextState event null
+        if Option.isSome nextState then 
+          transition current (Option.get nextState)
     ///Fire an event with data
     member this.Fire(event, data) = 
       let cur = find current
       let trans = findTransition event cur
-      if trans.Guard() then transition current (trans.NextState event data)
+      if trans.Guard() then
+        let nextState = trans.NextState event data
+        if Option.isSome nextState then 
+          transition current (Option.get nextState)
 
 ///Sets up a new state config 
 let configure state = 
@@ -141,11 +147,11 @@ let transitionTo substate state = { state with AutoTransition = Some(substate) }
 ///Sets a transition to a new state on an event (same state allows re-entry)
 let on event endState state =
   { state with Transitions = 
-    { Event = event; NextState = (fun _ _ -> endState); Guard = (fun () -> true) }::state.Transitions }
+    { Event = event; NextState = (fun _ _ -> Some(endState)); Guard = (fun () -> true) }::state.Transitions }
 ///Sets a guarded transition to a new state on an event (same state allows re-entry)
 let onIf event guard endState state = 
   { state with Transitions = 
-    { Event = event; NextState = (fun _ _ -> endState); Guard = guard }::state.Transitions }
+    { Event = event; NextState = (fun _ _ -> Some(endState)); Guard = guard }::state.Transitions }
 ///Sets an event handler (with or without data) which returns the new state to transition to
 let handle event f state = 
   { state with Transitions = 

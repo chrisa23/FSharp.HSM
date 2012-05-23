@@ -47,7 +47,7 @@ type ComplexHSM() =
             |> onExit (fun () -> printfn "Exit S11")
             |> substateOf S1
             |> on G S211 
-            |> handleIf H (fun () -> foo) (fun event arg -> printfn "fooFal"; foo <- false; S11)
+            |> handleIf H (fun () -> foo) (fun event arg -> printfn "fooFal"; foo <- false; None)
           configure S2
             |> onEntry (fun () -> printfn "Enter S2")
             |> onExit (fun () -> printfn "Exit S2")
@@ -60,7 +60,7 @@ type ComplexHSM() =
             |> substateOf S2
             |> transitionTo S211
             |> on B S211 
-            |> handleIf H (fun () -> not foo) (fun event arg -> printfn "fooTru"; foo <- true; S21 )
+            |> handleIf H (fun () -> not foo) (fun event arg -> printfn "fooTru"; foo <- true; Some(S21) )
           configure S211
             |> onEntry (fun () -> printfn "Enter S211")
             |> onExit (fun () -> printfn "Exit S211")
