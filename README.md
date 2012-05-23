@@ -44,7 +44,7 @@ Complex HSM:
           configure S11
             |> substateOf S1
             |> on G S211 
-            |> handleIf H (fun () -> foo) (fun event arg -> printfn "fooFal"; foo <- false; S11)
+            |> handleIf H (fun () -> foo) (fun event arg -> foo <- false; None)
           configure S2
             |> substateOf S0
             |> on C S1 
@@ -53,7 +53,7 @@ Complex HSM:
             |> substateOf S2
             |> transitionTo S211
             |> on B S211 
-            |> handleIf H (fun () -> not foo) (fun event arg -> printfn "fooTru"; foo <- true; S21 )
+            |> handleIf H (fun () -> not foo) (fun event arg -> foo <- true; Some(S21) )
           configure S211
             |> substateOf S21
             |> on D S21
