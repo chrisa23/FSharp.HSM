@@ -29,22 +29,22 @@ let stopTimer() =
     timerOn <- false
 
 let newPhoneCall() = 
-    new StateMachine<State,Trigger>(
-        [ configure OffHook
-            |> on CallDialed Ringing
-          configure Ringing
-            |> on CallConnected Connected
-          configure Connected
-            |> onEntry startTimer
-            |> onExit stopTimer
-            |> transitionTo InCall
-            |> on HungUp OffHook
-          configure InCall
-            |> substateOf Connected
-            |> on PlacedOnHold OnHold
-          configure OnHold
-            |> substateOf Connected
-            |> on TakenOffHold InCall ] )
+  [ configure OffHook
+      |> on CallDialed Ringing
+    configure Ringing
+      |> on CallConnected Connected
+    configure Connected
+      |> onEntry startTimer
+      |> onExit stopTimer
+      |> transitionTo InCall
+      |> on HungUp OffHook
+    configure InCall
+      |> substateOf Connected
+      |> on PlacedOnHold OnHold
+    configure OnHold
+      |> substateOf Connected
+      |> on TakenOffHold InCall ] 
+  |> create
 
 let check phoneCall trueStates falseStates (timer: bool) = 
     timerOn |> should equal timer

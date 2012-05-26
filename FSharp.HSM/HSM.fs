@@ -1,10 +1,19 @@
 ﻿module FSharp.HSM 
 
 open SymbolTables
+open Option
 
 exception NoTransition
 exception NotInitialized
 exception AlreadyStarted
+
+type IStateMachine<'state,'event> =
+  abstract member StateChanged: IEvent<'state>
+  abstract member Init: 'state -> unit
+  abstract member State: 'state with get
+  abstract member IsIn: 'state -> bool
+  abstract member Fire: 'event -> unit
+  abstract member Fire: 'event * obj -> unit
 
 type Transition<'state,'event> = 
   { Event: 'event 
@@ -20,7 +29,7 @@ type StateConfig<'state,'event> =
     AutoTransition: 'state option
     Transitions: Transition<'state,'event> list }
 
-type StateMachine<'state,'event when 'state : equality and 'event :equality>(stateList:StateConfig<'state,'event> list) = 
+type internal StateMachine<'state,'event when 'state : equality and 'event :equality>(stateList:StateConfig<'state,'event> list) = 
     let mutable current = stateList.Head.State
     let mutable started = false
     let states = stateList |> List.map (fun x -> x.State) |> List.toArray
@@ -29,8 +38,8 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
     let find state : StateConfig<'state,'event> = configs.[stateTable.Get state]
     let rec getParents results state =
       let currentConfig = stateList |> List.find (fun x -> x.State = state)
-      if Option.isSome currentConfig.SuperState then 
-        let super = Option.get currentConfig.SuperState
+      if isSome currentConfig.SuperState then 
+        let super = get currentConfig.SuperState
         getParents (super::results) super
       else results |> List.rev
 
@@ -92,44 +101,45 @@ type StateMachine<'state,'event when 'state : equality and 'event :equality>(sta
       match newStateConfig.AutoTransition with
       | None -> ()
       | Some x -> transition newState x
+    interface IStateMachine<'state, 'event> with
+      ///Initializes the state machine with its initial state
+      member this.Init state = 
+        if started then raise AlreadyStarted else started <- true
+        let stateConfig = find state
+        current <- state
+        stateConfig.Entry()
+        stateEvent.Trigger current
+        match stateConfig.AutoTransition with
+        | None -> ()
+        | Some x -> transition state x
+      ///Gets the current state
+      member this.State with get() = if not started then raise NotInitialized else current
+      ///Raise on a state change
+      member this.StateChanged = stateEvent.Publish
+      ///Check whether in state or parent state
+      member this.IsIn (state:'state) = 
+        if not started then raise NotInitialized
+        if current = state then true else
+          (find current).Parents |> List.exists (fun x -> x = state)
+      ///Fire an event without data
+      member this.Fire(event) = 
+        if not started then raise NotInitialized
+        let cur = find current
+        let trans = findTransition event cur
+        if trans.Guard() then 
+          let nextState = trans.NextState event null
+          if isSome nextState then 
+            transition current (get nextState)
+      ///Fire an event with data
+      member this.Fire(event, data) = 
+        let cur = find current
+        let trans = findTransition event cur
+        if trans.Guard() then
+          let nextState = trans.NextState event data
+          if isSome nextState then 
+            transition current (get nextState)
 
-    ///Initializes the state machine with its initial state
-    member this.Init state = 
-      if started then raise AlreadyStarted else started <- true
-      let stateConfig = find state
-      current <- state
-      stateConfig.Entry()
-      stateEvent.Trigger current
-      match stateConfig.AutoTransition with
-      | None -> ()
-      | Some x -> transition state x
-    ///Gets the current state
-    member this.State with get() = if not started then raise NotInitialized else current
-    ///Raise on a state change
-    member this.StateChanged = stateEvent.Publish
-    ///Check whether in state or parent state
-    member this.IsIn (state:'state) = 
-      if not started then raise NotInitialized
-      if current = state then true else
-        (find current).Parents |> List.exists (fun x -> x = state)
-    ///Fire an event without data
-    member this.Fire(event) = 
-      if not started then raise NotInitialized
-      let cur = find current
-      let trans = findTransition event cur
-      if trans.Guard() then 
-        let nextState = trans.NextState event null
-        if Option.isSome nextState then 
-          transition current (Option.get nextState)
-    ///Fire an event with data
-    member this.Fire(event, data) = 
-      let cur = find current
-      let trans = findTransition event cur
-      if trans.Guard() then
-        let nextState = trans.NextState event data
-        if Option.isSome nextState then 
-          transition current (Option.get nextState)
-
+let create(stateList:StateConfig<'state,'event> list) = (new StateMachine<'state,'event>(stateList)) :> IStateMachine<'state,'event>
 ///Sets up a new state config 
 let configure state = 
   { State = state; Entry = (fun () -> ()); Exit = (fun () -> ()); 
