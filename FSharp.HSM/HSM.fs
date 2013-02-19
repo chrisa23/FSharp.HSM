@@ -36,7 +36,6 @@ type internal StateMachine<'state,'event when 'state : equality and 'event :equa
     let mutable current = stateList.Head.State
     let mutable started = false
     let states = stateList |> List.map (fun x -> x.State) |> List.toArray
-    //let stateTable = SymbolTable states
     let configs = new Dictionary<'state,StateConfig<'state,'event>>()
     let find state : StateConfig<'state,'event> = configs.[state]
     let rec getParents results state =
@@ -170,5 +169,3 @@ let handle event f state =
 let handleIf event guard f state = 
   { state with Transitions = 
     { Event = event; NextState = f; Guard = guard }::state.Transitions }
-
-let public (!->) evt (sm:IStateMachine<_,_>) = sm.Fire evt
