@@ -1,7 +1,7 @@
 ﻿module FSharp.HSM 
 
-open SymbolTables
 open Option
+open System.Collections.Generic
 
 exception NoTransition
 exception NotInitialized
@@ -12,8 +12,10 @@ type IStateMachine<'state,'event> =
   abstract member Init: 'state -> unit
   abstract member State: 'state with get
   abstract member IsIn: 'state -> bool
+
   abstract member Fire: 'event -> unit
   abstract member Fire: 'event * obj -> unit
+
 
 type Transition<'state,'event> = 
   { Event: 'event 
@@ -30,12 +32,13 @@ type StateConfig<'state,'event> =
     Transitions: Transition<'state,'event> list }
 
 type internal StateMachine<'state,'event when 'state : equality and 'event :equality>(stateList:StateConfig<'state,'event> list) = 
+    let stateEvent = new Event<'state>()
     let mutable current = stateList.Head.State
     let mutable started = false
     let states = stateList |> List.map (fun x -> x.State) |> List.toArray
-    let stateTable = SymbolTable states
-    let configs = stateTable.Dictionary()
-    let find state : StateConfig<'state,'event> = configs.[stateTable.Get state]
+    //let stateTable = SymbolTable states
+    let configs = new Dictionary<'state,StateConfig<'state,'event>>()
+    let find state : StateConfig<'state,'event> = configs.[state]
     let rec getParents results state =
       let currentConfig = stateList |> List.find (fun x -> x.State = state)
       if isSome currentConfig.SuperState then 
@@ -45,15 +48,14 @@ type internal StateMachine<'state,'event when 'state : equality and 'event :equa
 
     do 
       for stateConfig in stateList do
-        configs.[stateTable.Get stateConfig.State] <- { stateConfig with Parents = getParents [] stateConfig.State }
+        configs.[stateConfig.State] <- { stateConfig with Parents = getParents [] stateConfig.State }
     
     let rec findTransition event state = 
       match state.Transitions |> List.tryFind (fun x -> x.Event = event), state.SuperState with
       | None, None -> raise NoTransition
       | None, Some x -> findTransition event (find x)
       | Some x, _ -> x
-    let stateEvent = new Event<'state>()
-
+    
     let rec exitToCommonParent state limit = 
       match state.SuperState, limit with
       | None, _ -> ()
@@ -168,3 +170,5 @@ let handle event f state =
 let handleIf event guard f state = 
   { state with Transitions = 
     { Event = event; NextState = f; Guard = guard }::state.Transitions }
+
+let public (!->) evt (sm:IStateMachine<_,_>) = sm.Fire evt

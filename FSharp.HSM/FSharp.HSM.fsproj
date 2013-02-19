@@ -40,7 +40,6 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="SymbolTable.fs" />
     <Compile Include="HSM.fs" />
   </ItemGroup>
   <PropertyGroup>

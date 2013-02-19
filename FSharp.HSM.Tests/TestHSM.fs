@@ -68,7 +68,7 @@ type ComplexHSM() =
           |> create
   member this.Hsm with get() = hsm
 
-let fire (hsm:IStateMachine<State,Sig>) signal = 
+let fireF (hsm:IStateMachine<State,Sig>) signal = 
     printfn "fire %A" signal
     hsm.Fire(signal)
 
@@ -77,24 +77,25 @@ let fire (hsm:IStateMachine<State,Sig>) signal =
 let HsmTest() = 
     let hsm = (new ComplexHSM()).Hsm
     hsm.Init S0
-    fire hsm A
-    fire hsm H
-    fire hsm E
-    fire hsm E
+    let fire = fireF hsm
+    fire A
+    fire H
+    fire E
+    fire E
     //error
     try
-      fire hsm A
+      fire A
     with 
       | NoTransition -> ()
-    fire hsm H
+    fire H
     //we should not exit S2 and S0 here... plus we should enter S21
     //foo should be set and not allow next transition...
-    fire hsm H
-    fire hsm G
+    fire H
+    fire G
     //not doing actions for now
-    //fire hsm H
-    //fire hsm H
-    fire hsm A
-    fire hsm H
+    //fire H
+    //fire H
+    fire A
+    fire H
 
       

@@ -43,6 +43,8 @@
     <Compile Include="Bug.fs" />
     <Compile Include="TestHSM.fs" />
     <Compile Include="PhoneCall.fs" />
+    <Compile Include="Order.fs" />
+    <Compile Include="Trade.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FsUnit.NUnit">
