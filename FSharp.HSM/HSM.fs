@@ -38,16 +38,15 @@ type internal StateMachine<'state,'event when 'state : equality and 'event :equa
     let states = stateList |> List.map (fun x -> x.State) |> List.toArray
     let configs = new Dictionary<'state,StateConfig<'state,'event>>()
     let find state : StateConfig<'state,'event> = configs.[state]
-    let rec getParents results state =
+    let rec getParents state =
       let currentConfig = stateList |> List.find (fun x -> x.State = state)
-      if isSome currentConfig.SuperState then 
-        let super = get currentConfig.SuperState
-        getParents (super::results) super
-      else results |> List.rev
+      match currentConfig.SuperState with
+      | None -> []
+      | Some super -> super::(getParents super)
 
     do 
       for stateConfig in stateList do
-        configs.[stateConfig.State] <- { stateConfig with Parents = getParents [] stateConfig.State }
+        configs.[stateConfig.State] <- { stateConfig with Parents = getParents stateConfig.State }
     
     let rec findTransition event state = 
       match state.Transitions |> List.tryFind (fun x -> x.Event = event), state.SuperState with
