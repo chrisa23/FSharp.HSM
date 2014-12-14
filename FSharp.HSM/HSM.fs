@@ -1,8 +1,5 @@
 ﻿module FSharp.HSM 
 
-open Option
-open System.Collections.Generic
-
 exception NoTransition
 exception NotInitialized
 exception AlreadyStarted
@@ -31,22 +28,24 @@ type StateConfig<'state,'event> =
     AutoTransition: 'state option
     Transitions: Transition<'state,'event> list }
 
-type internal StateMachine<'state,'event when 'state : equality and 'event :equality>(stateList:StateConfig<'state,'event> list) = 
+type internal StateMachine<'state,'event when 'state : equality and 'state: comparison and 'event :equality>(stateList:StateConfig<'state,'event> list) = 
     let stateEvent = new Event<'state>()
     let mutable current = stateList.Head.State
     let mutable started = false
     let states = stateList |> List.map (fun x -> x.State) |> List.toArray
-    let configs = new Dictionary<'state,StateConfig<'state,'event>>()
-    let find state : StateConfig<'state,'event> = configs.[state]
+    
     let rec getParents state =
       let currentConfig = stateList |> List.find (fun x -> x.State = state)
       match currentConfig.SuperState with
       | None -> []
       | Some super -> super::(getParents super)
 
-    do 
-      for stateConfig in stateList do
-        configs.[stateConfig.State] <- { stateConfig with Parents = getParents stateConfig.State }
+    let configs = 
+        stateList 
+        |> List.map (fun config -> config.State, { config with Parents = getParents config.State } )
+        |> Map.ofList
+
+    let find state : StateConfig<'state,'event> = configs.[state]
     
     let rec findTransition event state = 
       match state.Transitions |> List.tryFind (fun x -> x.Event = event), state.SuperState with
@@ -128,16 +127,16 @@ type internal StateMachine<'state,'event when 'state : equality and 'event :equa
         let trans = findTransition event cur
         if trans.Guard() then 
           let nextState = trans.NextState event null
-          if isSome nextState then 
-            transition current (get nextState)
+          if Option.isSome nextState then 
+            transition current (Option.get nextState)
       ///Fire an event with data
       member this.Fire(event, data) = 
         let cur = find current
         let trans = findTransition event cur
         if trans.Guard() then
           let nextState = trans.NextState event data
-          if isSome nextState then 
-            transition current (get nextState)
+          if Option.isSome nextState then 
+            transition current (Option.get nextState)
 
 let create(stateList:StateConfig<'state,'event> list) = (new StateMachine<'state,'event>(stateList)) :> IStateMachine<'state,'event>
 ///Sets up a new state config 

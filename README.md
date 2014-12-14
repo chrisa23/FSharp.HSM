@@ -12,6 +12,8 @@ Features:
 - Auto transitions
 - Event handlers with optional transitions
 
+Mostly a learning exercise.  Feedback and suggestions welcomed.
+
 
 Examples:
 
