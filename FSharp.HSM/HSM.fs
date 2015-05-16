@@ -9,7 +9,6 @@ type IStateMachine<'state,'event> =
   abstract member Init: 'state -> unit
   abstract member State: 'state with get
   abstract member IsIn: 'state -> bool
-
   abstract member Fire: 'event -> unit
   abstract member Fire: 'event * obj -> unit
 

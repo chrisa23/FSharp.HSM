@@ -35,7 +35,7 @@ Phone call:
       configure OnHold
         |> substateOf Connected
         |> on TakenOffHold InCall ]
-	|> create
+	|> HSM.create
 
 Complex HSM:
 
@@ -67,4 +67,4 @@ Complex HSM:
         |> substateOf S21
         |> on D S21
         |> on G S0 ]
-	|> create
+	|> HSM.create

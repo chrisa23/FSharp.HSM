@@ -75,20 +75,26 @@ module TradeTest =
       attachShow trade
 
       fire trade Start
+
       check trade [InMarket] [ Completed ]
 
       fireW trade Fill { Price = 3.0; Quantity = 2; Time = 3L; }
+      
       check trade [InTrade] [InMarket;  Completed; ]
 
       fireW trade Increase 1
+      
       check trade [InTrade] [InMarket;  Completed; ]
 
       fireW trade Decrease 1
+      
       check trade [InTrade] [InMarket;  Completed; ]
 
       fire trade Exit
+      
       check trade [Exiting] [InMarket;  InTrade; Completed; ]
 
       fireW trade Fill  { Price = 3.0; Quantity = 2; Time = 3L; }
+
       check trade [Completed] [InMarket;  InTrade; Exiting]
 
