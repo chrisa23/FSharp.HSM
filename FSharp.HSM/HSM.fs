@@ -14,8 +14,8 @@ type IStateMachine<'state,'event> =
 
 type Transition<'state,'event> = 
   { Event: 'event 
-    NextState: 'event -> obj -> 'state option
-    Guard: unit -> bool }
+    Guard: unit -> bool 
+    NextState: obj -> 'state option }
     
 type StateConfig<'state,'event when 'event:comparison> = 
   { State: 'state
@@ -95,7 +95,7 @@ type internal StateMachine<'state,'event
             let revParents = newStateConfig.Parents |> List.rev 
             let index = revParents |> List.findIndex (fun y -> y = x)
             for parent in revParents |> Seq.skip (index + 1) do
-            if parent <> currentState then (find parent).Entry()
+                if parent <> currentState then (find parent).Entry()
 
         current <- newState
         newStateConfig.Entry()
@@ -131,7 +131,7 @@ type internal StateMachine<'state,'event
             let cur = find current
             let trans = findTransition event cur
             if trans.Guard() then 
-                let nextState = trans.NextState event null
+                let nextState = trans.NextState null
                 if Option.isSome nextState then 
                     transition current (Option.get nextState)
         ///Fire an event with data
@@ -140,7 +140,7 @@ type internal StateMachine<'state,'event
             let cur = find current
             let trans = findTransition event cur
             if trans.Guard() then
-                let nextState = trans.NextState event data
+                let nextState = trans.NextState data
                 if Option.isSome nextState then 
                     transition current (Option.get nextState)
 
@@ -181,12 +181,12 @@ let transitionTo substate state = { state with AutoTransition = Some(substate) }
 
 ///Sets a transition to a new state on an event (same state allows re-entry)
 let on event endState state =
-    let transition = { Event = event; NextState = (fun _ _ -> Some(endState)); Guard = tru }
+    let transition = { Event = event; NextState = (fun _ -> Some(endState)); Guard = tru }
     { state with Transitions = state.Transitions.Add (event, transition) }
 
 ///Sets a guarded transition to a new state on an event (same state allows re-entry)
 let onIf event guard endState state = 
-    let transition = { Event = event; NextState = (fun _ _ -> Some(endState)); Guard = guard }
+    let transition = { Event = event; NextState = (fun _ -> Some(endState)); Guard = guard }
     { state with Transitions = state.Transitions.Add (event, transition ) }
 
 ///Sets an event handler (with or without data) which returns the new state to transition to

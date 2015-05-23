@@ -32,7 +32,7 @@ module OrderTest =
 
     type Order(qty) = 
         let mutable qtyFilled = 0
-        let fillFunc event fill = 
+        let fillFunc fill = 
             qtyFilled <- qtyFilled + (unbox fill).Quantity
             if qtyFilled = qty then Some(Filled) else
             if qtyFilled > qty then raise Overfill

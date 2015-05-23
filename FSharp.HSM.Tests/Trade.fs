@@ -25,25 +25,25 @@ module TradeTest =
     type Fill = { Price: float; Quantity: int; Time: int64; }
 
     type Trade() = 
-        let send event p = 
+        let send p = 
             printfn "Sending orders for trade"
             Some(InMarket)
-        let onFill event p = 
+        let onFill p = 
             printfn "Got fill -> InTrade"
             Some(InTrade)
-        let increase event p = 
+        let increase p = 
             printfn "Increase position"
             Some(InTrade)
-        let decrease event p = 
+        let decrease p = 
             printfn "Decrease position"
             Some(InTrade)
-        let cancel event p = 
+        let cancel p = 
             printfn "Cancel"
             Some(Exiting)
-        let exit event p = 
+        let exit p = 
             printfn "Exit"
             Some(Exiting)
-        let onExitFill event p = 
+        let onExitFill p = 
             printfn "Got fill -> Exited"
             Some(Completed)
         let state = 
