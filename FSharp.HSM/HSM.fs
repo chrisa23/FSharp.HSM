@@ -144,7 +144,7 @@ type internal StateMachine<'state,'event
                 if Option.isSome nextState then 
                     transition current (Option.get nextState)
 
-let internal unit = fun () -> ()
+let internal empty = fun () -> ()
 let internal tru = fun () -> true
 
 ///Create a state machine from configuration list
@@ -160,8 +160,8 @@ let create(stateList:StateConfig<'state,'event> list) =
 ///Sets up a new state config 
 let configure state = 
   { State = state; 
-    Entry = unit; 
-    Exit = unit; 
+    Entry = empty; 
+    Exit = empty; 
     SuperState = None; 
     Parents = []; 
     AutoTransition = None; 
