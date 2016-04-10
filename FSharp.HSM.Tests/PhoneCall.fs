@@ -33,6 +33,7 @@ let newPhoneCall() =
       |> on CallDialed Ringing
     configure Ringing
       |> on CallConnected Connected
+      |> on HungUp OffHook
     configure Connected
       |> onEntry startTimer
       |> onExit stopTimer

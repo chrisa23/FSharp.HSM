@@ -12,19 +12,57 @@ type IStateMachine<'state,'event> =
     abstract member Fire: 'event -> unit
     abstract member Fire: 'event * obj -> unit
 
+
 type Transition<'state,'event> = 
   { Event: 'event 
     Guard: unit -> bool 
     NextState: obj -> 'state option }
     
+
 type StateConfig<'state,'event when 'event:comparison> = 
   { State: 'state
     Entry: unit -> unit
     Exit: unit -> unit
     SuperState: 'state option
-    Parents: 'state list
+    Parents: StateConfig<'state,'event> list
     AutoTransition: 'state option
     Transitions: Map<'event, Transition<'state,'event>> }
+
+
+///Find the config from a list
+let find configList state =
+    List.find (fun x -> x.State = state) configList
+    
+let tryFind configList state =
+    List.tryFind (fun x -> x.State = state) configList
+    
+let rec getParents stateList state =
+    let currentConfig = find stateList state
+    match currentConfig.SuperState with
+    | None -> []
+    | Some super -> (find stateList super)::(getParents stateList super)
+
+
+let compileParents stateList =
+    stateList
+    |> List.map (fun x -> {x with Parents = getParents stateList x.State })
+
+
+let rec findTransition event state parents= 
+    match state.Transitions.TryFind event, parents with
+    | None, [] -> raise NoTransition
+    | None, h::t -> findTransition event h t
+    | Some x, _ -> x
+
+
+let rec findCommon (list1:StateConfig<'state,'event> list) (list2:StateConfig<'state,'event> list) = 
+    if list1.IsEmpty || list2.IsEmpty then None else
+    let h::t = list1
+    match tryFind list2 h.State, t with
+    | None, [] -> None
+    | None, _ -> findCommon t list2
+    | Some x, _ -> Some(x)
+
 
 type internal StateMachine<'state,'event 
         when 'state : equality 
@@ -34,50 +72,31 @@ type internal StateMachine<'state,'event
     let stateEvent = new Event<'state>()
     let mutable current = stateList.Head.State
     let mutable started = false
-    let states = stateList |> List.map (fun x -> x.State) |> List.toArray
-    
-    let rec getParents state =
-        let currentConfig = stateList |> List.find (fun x -> x.State = state)
-        match currentConfig.SuperState with
-        | None -> []
-        | Some super -> super::(getParents super)
 
     let configs = 
         stateList 
-        |> List.map (fun config -> 
-            config.State, { config with Parents = getParents config.State } )
+        |> compileParents
+        |> List.map (fun config -> config.State, config )
         |> Map.ofList
 
     let find state : StateConfig<'state,'event> = configs.[state]
-    
-    let rec findTransition event state = 
-        match state.Transitions.TryFind event, state.SuperState with
-        | None, None -> raise NoTransition
-        | None, Some x -> findTransition event (find x)
-        | Some x, _ -> x
+
     
     let rec exitToCommonParent state limit = 
         match state.SuperState, limit with
         | None, _ -> ()
-        | Some super, Some lim when super = lim -> ()
+        | Some super, Some lim when super = lim.State -> ()
         | Some super, _  -> 
             let superConfig = find super
             superConfig.Exit()
             exitToCommonParent superConfig limit 
-
-    let rec findCommon (list1:'state list) list2 = 
-          if list1.IsEmpty then None else
-          let restOfList1 = list1.Tail
-          match list2 |> List.tryFind (fun x -> x = list1.Head), restOfList1 with
-          | None, [] -> None
-          | None, _ -> findCommon restOfList1 list2
-          | Some x, _ -> Some(x)
+            
 
     let rec transition currentState newState = 
         let currentStateConfig, newStateConfig = find currentState, find newState
       
         let isSelf = currentStateConfig.State = newStateConfig.State
-        let moveToSub = not isSelf || newStateConfig.Parents |> List.exists (fun x -> x = currentState)
+        let moveToSub = not isSelf || newStateConfig.Parents |> List.exists (fun x -> x.State = currentState)
         let commonParent = 
             if isSelf then None 
             else findCommon currentStateConfig.Parents newStateConfig.Parents 
@@ -93,9 +112,9 @@ type internal StateMachine<'state,'event
         | None -> ()
         | Some x -> //todo: optimize this
             let revParents = newStateConfig.Parents |> List.rev 
-            let index = revParents |> List.findIndex (fun y -> y = x)
+            let index = revParents |> List.findIndex (fun y -> y.State = x.State)
             for parent in revParents |> Seq.skip (index + 1) do
-                if parent <> currentState then (find parent).Entry()
+                if parent.State <> currentState then (find parent.State).Entry()
 
         current <- newState
         newStateConfig.Entry()
@@ -124,12 +143,12 @@ type internal StateMachine<'state,'event
         member this.IsIn (state:'state) = 
             if not started then raise NotInitialized
             if current = state then true else
-                (find current).Parents |> List.exists (fun x -> x = state)
+                (find current).Parents |> List.exists (fun x -> x.State = state)
         ///Fire an event without data
         member this.Fire(event) = 
             if not started then raise NotInitialized
             let cur = find current
-            let trans = findTransition event cur
+            let trans = findTransition event cur cur.Parents
             if trans.Guard() then 
                 let nextState = trans.NextState null
                 if Option.isSome nextState then 
@@ -138,7 +157,7 @@ type internal StateMachine<'state,'event
         member this.Fire(event, data) = 
             if not started then raise NotInitialized
             let cur = find current
-            let trans = findTransition event cur
+            let trans = findTransition event cur cur.Parents
             if trans.Guard() then
                 let nextState = trans.NextState data
                 if Option.isSome nextState then 
