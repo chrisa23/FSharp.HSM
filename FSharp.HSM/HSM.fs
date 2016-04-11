@@ -82,9 +82,10 @@ let exitEnter takeWhile currentParents newParents =
     |> Seq.iter exit
 
     newParents 
-    |> List.rev 
     |> Seq.takeWhile takeWhile
-    |> Seq.iter enter
+    |> Seq.toList
+    |> List.rev 
+    |> List.iter enter
   
 ///Exit from current parents and enter new parents, up to first common parent
 let exitThenEnterParents currentParents newParents =
@@ -105,7 +106,7 @@ type internal StateMachine<'state,'event
 
     let configs = stateList |> createStateMap
 
-    let rec transition (newState : 'state) = 
+    let rec transition newState = 
         let newStateConfig = configs.[newState]
              
         if current.State <> newStateConfig.State then current.Exit()
