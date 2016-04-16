@@ -11,8 +11,8 @@ let fireW (trade:IStateMachine<_,_>) trigger data =
     printfn "fire %A" trigger
     trade.Fire(trigger, data)
 
-let attachShow (phoneCall:IStateMachine<_,_>) = phoneCall.StateChanged.Add (fun state -> printfn "%A" state)
-let isInState (phoneCall:IStateMachine<_,_>) state = phoneCall.IsIn state |> should equal true
-let isNotInState (phoneCall:IStateMachine<_,_>) state = phoneCall.IsIn state |> should equal false
+let attachShow (hsm:IStateMachine<_,_>) = hsm.StateChanged.Add (fun state -> printfn "%A" state)
+let isInState (hsm:IStateMachine<_,_>) state = hsm.IsIn state |> should equal true
+let isNotInState (hsm:IStateMachine<_,_>) state = hsm.IsIn state |> should equal false
 
 

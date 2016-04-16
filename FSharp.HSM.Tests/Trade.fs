@@ -1,4 +1,4 @@
-﻿namespace AutomatonTests  
+﻿namespace FSharp.HSM.Tests  
 
 open FSharp.HSM
 open System

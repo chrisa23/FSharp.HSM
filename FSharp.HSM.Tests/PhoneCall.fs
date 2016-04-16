@@ -21,12 +21,20 @@ type Trigger =
     | TakenOffHold
 
 let mutable timerOn = false
+
 let startTimer() = 
     printfn "%A connected" DateTime.Now
     timerOn <- true
+
 let stopTimer() = 
     printfn "%A ended" DateTime.Now
     timerOn <- false
+
+let startHoldMusic() = 
+    printfn "%A on hold" DateTime.Now
+
+let endHoldMusic() = 
+    printfn "%A off hold" DateTime.Now
 
 let newPhoneCall() = 
   [ configure OffHook
@@ -44,6 +52,8 @@ let newPhoneCall() =
       |> on PlacedOnHold OnHold
     configure OnHold
       |> substateOf Connected
+      |> onEntry startHoldMusic
+      |> onExit endHoldMusic
       |> on TakenOffHold InCall ] 
   |> create
 

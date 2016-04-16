@@ -48,7 +48,7 @@ let compileParents stateList =
     stateList
     |> List.map (fun x -> {x with Parents = getParents stateList x.State })
 
-///Create state definitaion map
+///Create state definition map
 let createStateMap stateList =
     stateList 
     |> compileParents
@@ -78,12 +78,11 @@ let enter state = state.Enter()
 ///Do exit/enter
 let exitEnter takeWhile currentParents newParents =
     currentParents 
-    |> Seq.takeWhile takeWhile
-    |> Seq.iter exit
+    |> List.takeWhile takeWhile
+    |> List.iter exit
 
     newParents 
-    |> Seq.takeWhile takeWhile
-    |> Seq.toList
+    |> List.takeWhile takeWhile
     |> List.rev 
     |> List.iter enter
   
@@ -108,14 +107,18 @@ type internal StateMachine<'state,'event
 
     let rec transition newState = 
         let newStateConfig = configs.[newState]
-             
-        if current.State <> newStateConfig.State then current.Exit()
 
-        exitThenEnterParents current.Parents newStateConfig.Parents
+        let isSub = tryFind newStateConfig.Parents current.State |> Option.isSome
+
+        if current.State <> newStateConfig.State && not isSub then current.Exit()
+
+        if not isSub 
+        then  exitThenEnterParents current.Parents newStateConfig.Parents
             
         current <- newStateConfig
         newStateConfig.Enter()
         
+        //Should we raise event for auto transitions?
         match newStateConfig.AutoTransition with
         | None -> stateEvent.Trigger newState
         | Some x -> transition x
@@ -177,10 +180,10 @@ let configure state =
     Transitions = new Map<'event, Transition<'state,'event>>([]); }
 
 ///Sets am action on the entry of the state
-let onEntry f state = {state with Enter = f }
+let onEntry f state = {state with Enter = state.Enter >> f }
 
 ///Sets an action on the exit of the state
-let onExit f state = {state with Exit = f }
+let onExit f state = {state with Exit = state.Exit >> f }
 
 ///Sets this state as a substate of the given state
 let substateOf superState state = { state with SuperState = Some(superState) }

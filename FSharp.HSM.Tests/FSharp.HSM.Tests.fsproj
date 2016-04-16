@@ -9,11 +9,12 @@
     <OutputType>Library</OutputType>
     <RootNamespace>Automaton.Tests</RootNamespace>
     <AssemblyName>FSharp.HSM.Tests</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <Name>FSharp.HSM.Tests</Name>
-    <TargetFSharpCoreVersion>4.3.0.0</TargetFSharpCoreVersion>
+    <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
     <RestorePackages>true</RestorePackages>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -58,12 +59,14 @@
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
   <ItemGroup>
+    <Compile Include="FunctionTests.fs" />
     <Compile Include="TestHelpers.fs" />
     <Compile Include="Bug.fs" />
     <Compile Include="TestHSM.fs" />
     <Compile Include="PhoneCall.fs" />
     <Compile Include="Order.fs" />
     <Compile Include="Trade.fs" />
+    <Compile Include="PELICAN.fs" />
     <None Include="packages.config" />
     <None Include="app.config" />
   </ItemGroup>

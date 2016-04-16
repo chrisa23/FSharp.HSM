@@ -37,7 +37,7 @@ let onAssigned(trigger:obj) =
 //
 let machine = 
     [ configure State.Open
-        //|> on Trigger.Assign State.Assigned //??? is there a way to do this?
+        |> on Trigger.Assign State.Assigned //??? is there a way to do this?
         |> handle Trigger.Assign onAssigned
       configure State.Assigned
         |> substateOf State.Open
