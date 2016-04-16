@@ -42,7 +42,7 @@ module PELICAN =
         let mutable hsm = Unchecked.defaultof<IStateMachine<State,Event>>
 
         let vehicleSignal = Event<VehicleSignal>()
-        let vehicleSignal = Event<PedestrianSignal>()
+        let pedestrianSignal = Event<PedestrianSignal>()
 
         let runTimer x = 
             async { 
@@ -53,16 +53,18 @@ module PELICAN =
         
         let setTimer x = (fun () -> runTimer x)
 
-        //let killTimer() = ()//timer.Dispose() 
-
         let shutdown() = printfn "shutdown" 
 
         let mutable isPedestrianWaiting = false
         let flashCount = ref 0
 
-        let signalVehicles (state: VehicleSignal) = printfn "%A" state
+        let signalVehicles (state: VehicleSignal) = 
+            printfn "%A" state
+            vehicleSignal.Trigger state
 
-        let signalPedestrians (state: PedestrianSignal) = printfn "%A" state
+        let signalPedestrians (state: PedestrianSignal) = 
+            printfn "%A" state
+            pedestrianSignal.Trigger state
 
         let dontWalk() = signalPedestrians DontWalk
         let walk() = signalPedestrians Walk
@@ -83,7 +85,7 @@ module PELICAN =
             then Some VehiclesYellow 
             else Some VehiclesGreenInt
 
-        let setFlashCount() = flashCount := 7
+        let setFlashCount() = flashCount := 11
 
         let timeoutFlashing _ = 
             decr flashCount
@@ -91,7 +93,7 @@ module PELICAN =
             match !flashCount with
             | 0 -> Some VehiclesEnabled
             | x when (x % 2) = 1 -> 
-                walk()
+                dontWalk()
                 Some PedestriansFlash
             | _ -> 
                 blank()
@@ -113,7 +115,6 @@ module PELICAN =
                     |> substateOf VehiclesEnabled
                     |> onEntry (setTimer 10.)
                     |> onEntry green
-                    //|> onExit killTimer
                     |> handle PedestrianWaiting handleWaitingOnGreen
                     |> handle Timeout handleTimeoutOnGreen
                 configure VehiclesGreenInt
@@ -121,9 +122,8 @@ module PELICAN =
                     |> on PedestrianWaiting VehiclesYellow
                 configure VehiclesYellow
                     |> substateOf VehiclesEnabled
-                    |> onEntry (setTimer 3.)
+                    |> onEntry (setTimer 4.)
                     |> onEntry yellow
-                    //|> onExit killTimer
                     |> on Timeout PedestriansEnabled
                 configure PedestriansEnabled
                     |> substateOf Operational
@@ -133,13 +133,11 @@ module PELICAN =
                     |> substateOf PedestriansEnabled
                     |> onEntry (setTimer 10.)
                     |> onEntry walk
-                    //|> onExit killTimer
                     |> onExit setFlashCount
                     |> on Timeout PedestriansFlash
                 configure PedestriansFlash
                     |> substateOf PedestriansEnabled
                     |> onEntry (setTimer 0.5)
-                    //|> onExit killTimer
                     |> handle Timeout timeoutFlashing
 
             ]
@@ -149,12 +147,16 @@ module PELICAN =
         member this.Start() = hsm.Init Operational
         member this.Stop() = hsm.Fire Event.Off
         member this.Walk() = hsm.Fire PedestrianWaiting
-        
+        member this.VehicleSignal = vehicleSignal.Publish
+        member this.PedestrianSignal = pedestrianSignal.Publish
+
+        member this.State = hsm.StateChanged
 
 
     [<Test>]
     let run() =
         let signal = PelicanSignal()
+        signal.State.Add(fun x -> printfn "%A" x)
         signal.Start()
         Async.Sleep 5000 |> Async.RunSynchronously
         signal.Walk()

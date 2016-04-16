@@ -75,24 +75,27 @@ let rec findCommon (list1:StateConfig<'state,'event> list) (list2:StateConfig<'s
 let exit state = state.Exit()
 let enter state = state.Enter()
 
-///Do exit/enter
-let exitEnter takeWhile currentParents newParents =
+let exitParents takeWhile currentParents =
     currentParents 
     |> List.takeWhile takeWhile
     |> List.iter exit
 
+let enterParents takeWhile newParents =
     newParents 
     |> List.takeWhile takeWhile
     |> List.rev 
     |> List.iter enter
   
 ///Exit from current parents and enter new parents, up to first common parent
-let exitThenEnterParents currentParents newParents =
+let exitThenEnterParents current newParents =
+    //have to take into account current for newParents
+    let currentParents = current::current.Parents
     let takeWhile = 
         match findCommon currentParents newParents  with
         | None -> (fun x -> true)
         | Some x -> (fun y -> x.State <> y.State)
-    exitEnter takeWhile currentParents newParents
+    exitParents takeWhile current.Parents
+    enterParents takeWhile newParents
 
 
 type internal StateMachine<'state,'event 
@@ -107,20 +110,28 @@ type internal StateMachine<'state,'event
 
     let rec transition newState = 
         let newStateConfig = configs.[newState]
-
+        
         let isSub = tryFind newStateConfig.Parents current.State |> Option.isSome
 
-        if current.State <> newStateConfig.State && not isSub then current.Exit()
-
-        if not isSub 
-        then  exitThenEnterParents current.Parents newStateConfig.Parents
+        //If we are transitioning to ourselves exit, but don't exit if we are going to a sub state
+        if current.State = newStateConfig.State || not isSub then current.Exit()
+        
+//        if not isSub 
+//        then  
+        //TODO:  fix exit/entry of parents...
+        exitThenEnterParents current newStateConfig.Parents
+        
+        //TODO: If it is a sub, enter all subStates past common parent
+        
+        newStateConfig.Enter()
             
         current <- newStateConfig
-        newStateConfig.Enter()
+        
+        stateEvent.Trigger newState
         
         //Should we raise event for auto transitions?
         match newStateConfig.AutoTransition with
-        | None -> stateEvent.Trigger newState
+        | None -> ()
         | Some x -> transition x
 
     interface IStateMachine<'state, 'event> with
@@ -131,8 +142,10 @@ type internal StateMachine<'state,'event
             current.Parents |> List.rev |> List.iter enter
             current.Enter()
             
+            stateEvent.Trigger current.State
+
             match current.AutoTransition with
-            | None -> stateEvent.Trigger current.State
+            | None -> ()
             | Some x -> transition x
         ///Gets the current state
         member this.State with get() = if not started then raise NotInitialized else current.State

@@ -12,8 +12,6 @@ Features:
 - Auto transitions
 - Event handlers with optional transitions
 
-Mostly a learning exercise.  Feedback and suggestions welcomed.
-
 
 Examples:
 
@@ -24,6 +22,7 @@ Phone call:
         |> on CallDialed Ringing
       configure Ringing
         |> on CallConnected Connected
+        |> on HungUp OffHook
       configure Connected
         |> onEntry startTimer
         |> onExit stopTimer
@@ -34,8 +33,10 @@ Phone call:
         |> on PlacedOnHold OnHold
       configure OnHold
         |> substateOf Connected
-        |> on TakenOffHold InCall ]
-	|> HSM.create
+        |> onEntry startHoldMusic
+        |> onExit endHoldMusic
+        |> on TakenOffHold InCall ] 
+      |> HSM.create
 
 Complex HSM:
 
