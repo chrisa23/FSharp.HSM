@@ -15,7 +15,6 @@ Features:
 
 Examples:
 
-
 Phone call:
 
     [ configure OffHook
@@ -36,36 +35,48 @@ Phone call:
         |> onEntry startHoldMusic
         |> onExit endHoldMusic
         |> on TakenOffHold InCall ] 
-      |> HSM.create
+    |> HSM.create
 
-Complex HSM:
+Pelican Signal HSM:
 
-    [ configure S0
-        |> transitionTo S1
-        |> on E S211
-      configure S1
-        |> substateOf S0
-        |> transitionTo S11
-        |> on A S1 
-        |> on B S11
-        |> on C S211 
-        |> on D S0 
-        |> on F S211 
-      configure S11
-        |> substateOf S1
-        |> on G S211 
-        |> handleIf H (fun () -> foo) (fun event arg -> foo <- false; None)
-      configure S2
-        |> substateOf S0
-        |> on C S1 
-        |> on F S11 
-      configure S21
-        |> substateOf S2
-        |> transitionTo S211
-        |> on B S211 
-        |> handleIf H (fun () -> not foo) (fun event arg -> foo <- true; Some(S21) )
-      configure S211
-        |> substateOf S21
-        |> on D S21
-        |> on G S0 ]
-	|> HSM.create
+![alt text](./Pelican.png "Pelican Demo")
+
+    [   configure State.Off
+            |> onEntry shutdown
+        configure Operational
+            |> onEntry (fun () -> printfn "Operational %A" DateTime.Now)
+            |> on Event.Off State.Off
+            |> transitionTo VehiclesEnabled
+        configure VehiclesEnabled
+            |> substateOf Operational
+            |> onEntry dontWalk
+            |> transitionTo VehiclesGreen
+        configure VehiclesGreen
+            |> substateOf VehiclesEnabled
+            |> onEntry (setTimer 10.)
+            |> onEntry green
+            |> handle PedestrianWaiting handleWaitingOnGreen
+            |> handle Timeout handleTimeoutOnGreen
+        configure VehiclesGreenInt
+            |> substateOf VehiclesEnabled
+            |> on PedestrianWaiting VehiclesYellow
+        configure VehiclesYellow
+            |> substateOf VehiclesEnabled
+            |> onEntry (setTimer 4.)
+            |> onEntry yellow
+            |> on Timeout PedestriansEnabled
+        configure PedestriansEnabled
+            |> substateOf Operational
+            |> transitionTo PedestriansWalk
+            |> onEntry red
+        configure PedestriansWalk
+            |> substateOf PedestriansEnabled
+            |> onEntry (setTimer 10.)
+            |> onEntry walk
+            |> onExit setFlashCount
+            |> on Timeout PedestriansFlash
+        configure PedestriansFlash
+            |> substateOf PedestriansEnabled
+            |> onEntry (setTimer 0.5)
+            |> handle Timeout timeoutFlashing ]
+    |> HSM.create
