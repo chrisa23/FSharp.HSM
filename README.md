@@ -39,7 +39,7 @@ Phone call:
 
 Pelican Signal HSM:
 
-![alt text](./Pelican.png "Pelican Demo")
+![alt text](./PelicanStateDiagram.png "Pelican State Diagram")
 
     [   configure State.Off
             |> onEntry shutdown
@@ -80,3 +80,6 @@ Pelican Signal HSM:
             |> onEntry (setTimer 0.5)
             |> handle Timeout timeoutFlashing ]
     |> HSM.create
+
+
+![alt text](./Pelican.png "Pelican Demo")
