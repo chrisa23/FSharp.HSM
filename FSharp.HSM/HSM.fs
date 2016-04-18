@@ -96,8 +96,7 @@ let exitThenEnterParents current newParents =
         | Some x -> (fun y -> x.State <> y.State)
     exitParents takeWhile current.Parents
     enterParents takeWhile newParents
-
-
+    
 type internal StateMachine<'state,'event 
         when 'state : equality and 'state : comparison 
         and 'event : equality and 'event : comparison> (stateList:StateConfig<'state,'event> list) = 
@@ -116,12 +115,7 @@ type internal StateMachine<'state,'event
         //If we are transitioning to ourselves exit, but don't exit if we are going to a sub state
         if current.State = newStateConfig.State || not isSub then current.Exit()
         
-//        if not isSub 
-//        then  
-        //TODO:  fix exit/entry of parents...
         exitThenEnterParents current newStateConfig.Parents
-        
-        //TODO: If it is a sub, enter all subStates past common parent
         
         newStateConfig.Enter()
             
@@ -129,7 +123,6 @@ type internal StateMachine<'state,'event
         
         stateEvent.Trigger newState
         
-        //Should we raise event for auto transitions?
         match newStateConfig.AutoTransition with
         | None -> ()
         | Some x -> transition x
