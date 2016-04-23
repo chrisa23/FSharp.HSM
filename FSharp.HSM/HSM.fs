@@ -1,32 +1,35 @@
-﻿module FSharp.HSM 
+﻿module FSharp.HSM
 
-exception NoTransition
-exception NotInitialized
-exception AlreadyStarted
-
-type IStateMachine<'state,'event> =
+type IStateMachine<'state, 'event, 'output> =
     abstract member StateChanged: IEvent<'state>
-    abstract member Init: 'state -> unit
-    abstract member State: 'state with get
+    abstract member EventRaised: IEvent<'output>
+    abstract member Init: 'state -> unit //Have it always start in first state?
+    abstract member State: 'state [] with get//Make a state[] to handle multiple states?
+    abstract member Permitted: 'event [] with get
+    abstract member CanFire: 'event -> bool
     abstract member IsIn: 'state -> bool
     abstract member Fire: 'event -> unit
     abstract member Fire: 'event * obj -> unit
-
+    
 ///Holds transition information for state
-type Transition<'state,'event> = 
+type Transition<'state,'event, 'output> = 
   { Event: 'event 
     Guard: unit -> bool 
+    Raises: 'output option
     NextState: obj -> 'state option }
 
 ///Holds details of state
-type StateConfig<'state,'event when 'event:comparison> = 
+type StateConfig<'state, 'event, 'output when 'event:comparison> = 
   { State: 'state
     Enter: unit -> unit
     Exit: unit -> unit
     SuperState: 'state option
-    Parents: StateConfig<'state,'event> list
+    Parents: StateConfig<'state,'event,'output> list
     AutoTransition: 'state option
-    Transitions: Map<'event, Transition<'state,'event>> }
+    Transitions: Map<'event, Transition<'state,'event, 'output>> 
+    EnterRaises: 'output list
+    ExitRaises: 'output list
+    }
 
 ///Find the state definition from a list
 let find configList state =
@@ -58,12 +61,12 @@ let createStateMap stateList =
 ///Find a transition from a state and its parents
 let rec findTransition event state parents = 
     match state.Transitions.TryFind event, parents with
-    | None, [] -> raise NoTransition
+    | None, [] -> None
     | None, h::t -> findTransition event h t
-    | Some x, _ -> x
+    | Some x, _ -> Some x
 
 ///Try and find a common state among state lists
-let rec findCommon (list1:StateConfig<'state,'event> list) (list2:StateConfig<'state,'event> list) = 
+let rec findCommon (list1:StateConfig<'state,'event, 'output> list) (list2:StateConfig<'state,'event,'output> list) = 
     if list1.IsEmpty || list2.IsEmpty then None else
     let h::t = list2
     match tryFind list1 h.State, t with
@@ -72,40 +75,54 @@ let rec findCommon (list1:StateConfig<'state,'event> list) (list2:StateConfig<'s
     | Some x, _ -> Some(x)
 
 //Helpers
-let exit state = state.Exit()
-let enter state = state.Enter()
+let exit f state = 
+    state.Exit()
+    List.iter f state.ExitRaises
 
-let exitParents takeWhile currentParents =
+let enter f state = 
+    state.Enter()
+    List.iter f state.EnterRaises
+
+let getTakeWhile list1 list2 = 
+    match findCommon list1 list2 with
+    | None -> (fun x -> true)
+    | Some x -> (fun y -> x.State <> y.State)
+
+let exitParents f takeWhile currentParents =
     currentParents 
     |> List.takeWhile takeWhile
-    |> List.iter exit
+    |> List.iter (exit f)
 
-let enterParents takeWhile newParents =
+let enterParents f takeWhile newParents =
     newParents 
     |> List.takeWhile takeWhile
     |> List.rev 
-    |> List.iter enter
-  
-///Exit from current parents and enter new parents, up to first common parent
-let exitThenEnterParents current newParents =
-    //have to take into account current for newParents
-    let currentParents = current::current.Parents
-    let takeWhile = 
-        match findCommon currentParents newParents  with
-        | None -> (fun x -> true)
-        | Some x -> (fun y -> x.State <> y.State)
-    exitParents takeWhile current.Parents
-    enterParents takeWhile newParents
+    |> List.iter (enter f)
+
+let exitState f current newState = 
+    let takeWhile = getTakeWhile current.Parents newState.Parents
+    exitParents f takeWhile current.Parents
+
+let enterState f current newState = 
+    let takeWhile = getTakeWhile (current::current.Parents) newState.Parents
+    enterParents f takeWhile newState.Parents
+
+let getTransitions state =
+    state.Transitions |> Map.toArray |> Array.map fst
     
-type internal StateMachine<'state,'event 
+type internal StateMachine<'state, 'event, 'output 
         when 'state : equality and 'state : comparison 
-        and 'event : equality and 'event : comparison> (stateList:StateConfig<'state,'event> list) = 
+        //and 'output : equality and 'output : comparison 
+        and 'event : equality and 'event : comparison> (stateList:StateConfig<'state,'event,'output> list) = 
     
     let stateEvent = new Event<'state>()
-    let mutable current = Unchecked.defaultof<StateConfig<'state,'event>>
+    let outputEvent = new Event<'output>()
+    let mutable current = Unchecked.defaultof<StateConfig<'state,'event,'output>>
     let mutable started = false
 
     let configs = stateList |> createStateMap
+
+    let trigger x =  outputEvent.Trigger x
 
     let rec transition newState = 
         let newStateConfig = configs.[newState]
@@ -115,24 +132,34 @@ type internal StateMachine<'state,'event
         //If we are transitioning to ourselves exit, but don't exit if we are going to a sub state
         if current.State = newStateConfig.State || not isSub then current.Exit()
         
-        exitThenEnterParents current newStateConfig.Parents
-        
+        List.iter trigger current.ExitRaises
+
+        exitState trigger current newStateConfig
+        enterState trigger current newStateConfig
+
         newStateConfig.Enter()
             
         current <- newStateConfig
         
         stateEvent.Trigger newState
         
+        List.iter trigger  newStateConfig.EnterRaises
+
         match newStateConfig.AutoTransition with
         | None -> ()
         | Some x -> transition x
 
-    interface IStateMachine<'state, 'event> with
+    let tryTransition data trans =
+        if trans.Guard() then 
+            Option.iter trigger trans.Raises
+            Option.iter transition (trans.NextState data)
+    
+    interface IStateMachine<'state, 'event, 'output> with
         ///Initializes the state machine with its initial state
         member this.Init state = 
-            if started then raise AlreadyStarted else started <- true
+            started <- true
             current <- configs.[state]
-            current.Parents |> List.rev |> List.iter enter
+            current.Parents |> List.rev |> List.iter (enter trigger)
             current.Enter()
             
             stateEvent.Trigger current.State
@@ -141,33 +168,47 @@ type internal StateMachine<'state,'event
             | None -> ()
             | Some x -> transition x
         ///Gets the current state
-        member this.State with get() = if not started then raise NotInitialized else current.State
+        member this.State with get() = 
+            if not started then [||] else
+            [| current.State |] //TODO: handle multiple states
         ///Raise on a state change
         member this.StateChanged = stateEvent.Publish
+        //Raise an output event
+        member this.EventRaised = outputEvent.Publish
+
+        member this.Permitted with get() =
+            if not started then [||] else
+            let parents = Array.collect getTransitions (current.Parents |> List.toArray)
+            let curTrans = current |> getTransitions
+            Array.append parents curTrans
+
+        member this.CanFire event = 
+            if not started then false else
+            Array.contains event (this :> IStateMachine<_,'event,_>).Permitted
+
         ///Check whether in state or parent state
         member this.IsIn (state:'state) = 
-            if not started then raise NotInitialized
-            if current.State = state then true else
-                current.Parents |> List.exists (fun x -> x.State = state)
+            if not started then false else
+            if current.State = state then true 
+            else current.Parents |> List.exists (fun x -> x.State = state)
         ///Fire an event without data
         member this.Fire(event) = 
-            if not started then raise NotInitialized
+            if not started then () else
             let trans = findTransition event current current.Parents
-            if trans.Guard() then 
-                Option.iter transition (trans.NextState null)
+            Option.iter (tryTransition null) trans
+                
         ///Fire an event with data
         member this.Fire(event, data) = 
-            if not started then raise NotInitialized
+            if not started then () else
             let trans = findTransition event current current.Parents
-            if trans.Guard() then
-                Option.iter transition (trans.NextState data)
+            Option.iter (tryTransition data) trans
 
 let internal empty = fun () -> ()
 let internal tru = fun () -> true
 
 ///Create a state machine from configuration list
-let create(stateList:StateConfig<'state,'event> list) = 
-    (StateMachine<'state,'event>(stateList)) :> IStateMachine<'state,'event>
+let create(stateList:StateConfig<'state,'event,'output> list) = 
+    (StateMachine<'state,'event,'output>(stateList)) :> IStateMachine<'state,'event,'output>
 
 //###################################################################################
 //Builder DSL
@@ -177,13 +218,15 @@ let create(stateList:StateConfig<'state,'event> list) =
 
 ///Sets up a new state config 
 let configure state = 
-  { State = state; 
-    Enter = empty; 
-    Exit = empty; 
-    SuperState = None; 
-    Parents = []; 
-    AutoTransition = None; 
-    Transitions = new Map<'event, Transition<'state,'event>>([]); }
+  { State = state 
+    Enter = empty
+    Exit = empty
+    SuperState = None
+    Parents = []
+    AutoTransition = None
+    EnterRaises = []
+    ExitRaises = []
+    Transitions = new Map<'event, Transition<'state,'event,'output>>([]) }
 
 ///Sets am action on the entry of the state
 let onEntry f state = {state with Enter = state.Enter >> f }
@@ -197,23 +240,64 @@ let substateOf superState state = { state with SuperState = Some(superState) }
 ///Sets an auto transition to a new state
 let transitionTo substate state = { state with AutoTransition = Some(substate) }
 
+///Raises an output event
+let enterRaises output state = { state with EnterRaises = output::state.EnterRaises }
+
+///Raises an output event
+let exitRaises output state = { state with ExitRaises = output::state.ExitRaises }
+
 ///Sets a transition to a new state on an event (same state allows re-entry)
 let on event endState state =
-    let transition = { Event = event; NextState = (fun _ -> Some(endState)); Guard = tru }
+    let transition = { Event = event; NextState = (fun _ -> Some(endState)); Guard = tru; Raises = None }
     { state with Transitions = state.Transitions.Add (event, transition) }
 
 ///Sets a guarded transition to a new state on an event (same state allows re-entry)
 let onIf event guard endState state = 
-    let transition = { Event = event; NextState = (fun _ -> Some(endState)); Guard = guard }
+    let transition = { Event = event; NextState = (fun _ -> Some(endState)); Guard = guard; Raises = None }
     { state with Transitions = state.Transitions.Add (event, transition ) }
 
 ///Sets an event handler (with or without data) which returns the new state to transition to
 let handle event f state = 
-    let trans = { Event = event; NextState = f; Guard = tru }
+    let trans = { Event = event; NextState = f; Guard = tru; Raises = None }
     { state with Transitions = state.Transitions.Add (event, trans) }
 
 ///Sets a guarded event handler (with or without data) which returns the new state
 let handleIf event guard f state = 
   { state with Transitions = state.Transitions.Add (event,
-    { Event = event; NextState = f; Guard = guard }) }
+    { Event = event; NextState = f; Guard = guard; Raises = None }) }
 
+//Transitions withRaise
+
+///Sets a transition to a new state on an event (same state allows re-entry)
+let onWithRaise event endState output state =
+    let transition = { Event = event; NextState = (fun _ -> Some(endState)); Guard = tru; Raises = Some output }
+    { state with Transitions = state.Transitions.Add (event, transition) }
+
+///Sets a guarded transition to a new state on an event (same state allows re-entry)
+let onIfWithRaise event guard endState output state  = 
+    let transition = { Event = event; NextState = (fun _ -> Some(endState)); Guard = guard; Raises = Some output }
+    { state with Transitions = state.Transitions.Add (event, transition ) }
+
+///Sets an event handler (with or without data) which returns the new state to transition to
+let handleWithRaise event f output state = 
+    let trans = { Event = event; NextState = f; Guard = tru; Raises = Some output }
+    { state with Transitions = state.Transitions.Add (event, trans) }
+
+///Sets a guarded event handler (with or without data) which returns the new state
+let handleIfWithRaise event guard f output state = 
+  { state with Transitions = state.Transitions.Add (event,
+    { Event = event; NextState = f; Guard = guard; Raises = Some output }) }
+
+
+
+//Composition?
+let connect (hsm1:IStateMachine<_,_,'output>) (hsm2:IStateMachine<_,'output,_>) =
+    hsm1.EventRaised.Add (fun output -> hsm2.Fire output)
+
+
+//onWithRaise (event on transition)
+
+//allowReentry
+//allowReentryIf
+
+//onEntryFrom

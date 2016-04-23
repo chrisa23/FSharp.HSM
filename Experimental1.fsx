@@ -1,4 +1,4 @@
-﻿module FSharp.HSM2
+﻿module FSharp.HSM
 
 
 //How do we compose?
@@ -265,7 +265,7 @@ let handleIf event guard f state =
 //onEnterRaise
 //onExitRaise
 
-//onWithRaise
+//onWithRaise (event on transition)
 
 //allowReentry
 //allowReentryIf

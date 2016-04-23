@@ -39,7 +39,7 @@ module PELICAN =
     
     type PelicanSignal() = 
 
-        let mutable hsm = Unchecked.defaultof<IStateMachine<State,Event>>
+        let mutable hsm = Unchecked.defaultof<IStateMachine<State,Event, unit>>
 
         let vehicleSignal = Event<VehicleSignal>()
         let pedestrianSignal = Event<PedestrianSignal>()

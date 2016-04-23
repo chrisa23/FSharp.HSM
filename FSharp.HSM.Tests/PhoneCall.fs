@@ -114,10 +114,12 @@ let ``Dial -> Connect -> Hold -> UnHold -> HangUp``() =
     fire call HungUp
     check call [ OffHook; ] [Ringing; Connected; OnHold; InCall ] false
 
-[<Test; ExpectedException(typeof<NoTransition>)>]
-let ``Hold -> error``() =      
-    let call = newPhoneCall()
-    attachShow call
-    call.Init OffHook
-    fire call PlacedOnHold
+
+//
+//[<Test; ExpectedException(typeof<NoTransition>)>]
+//let ``Hold -> error``() =      
+//    let call = newPhoneCall()
+//    attachShow call
+//    call.Init OffHook
+//    fire call PlacedOnHold
       

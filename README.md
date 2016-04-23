@@ -11,7 +11,8 @@ Features:
 - Guards
 - Auto transitions
 - Event handlers with optional transitions
-
+- Output events for states and transitions
+- Introspection of available events
 
 Examples:
 
