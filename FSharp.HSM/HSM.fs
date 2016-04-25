@@ -26,7 +26,7 @@ type StateConfig<'state, 'event, 'output when 'event:comparison> =
     SuperState: 'state option
     Parents: StateConfig<'state,'event,'output> list
     AutoTransition: 'state option
-    Transitions: Map<'event, Transition<'state,'event, 'output>> 
+    Transitions: Map<'event, Transition<'state,'event,'output>> 
     EnterRaises: 'output list
     ExitRaises: 'output list
     }
@@ -295,7 +295,6 @@ let connect (hsm1:IStateMachine<_,_,'output>) (hsm2:IStateMachine<_,'output,_>) 
     hsm1.EventRaised.Add (fun output -> hsm2.Fire output)
 
 
-//onWithRaise (event on transition)
 
 //allowReentry
 //allowReentryIf
