@@ -1,0 +1,4 @@
+- Remove local dependencies in transition and make more functional
+- Decide on Init vs Start with default/root state
+- History 
+- Sets / concurrent states
