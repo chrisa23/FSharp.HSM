@@ -2,3 +2,4 @@
 - Decide on Init vs Start with default/root state
 - History 
 - Sets / concurrent states
+- Combine Pelican state chart and demo image
