@@ -4,7 +4,7 @@ type IStateMachine<'state, 'event, 'output> =
     abstract member StateChanged: IEvent<'state>
     abstract member EventRaised: IEvent<'output>
     abstract member Init: 'state -> unit //Have it always start in first state?
-    abstract member State: 'state [] with get//Make a state[] to handle multiple states?
+    abstract member State: 'state option with get//Make a state[] to handle multiple states?
     abstract member Permitted: 'event [] with get
     abstract member CanFire: 'event -> bool
     abstract member IsIn: 'state -> bool
@@ -112,7 +112,6 @@ let getTransitions state =
     
 type internal StateMachine<'state, 'event, 'output 
         when 'state : equality and 'state : comparison 
-        //and 'output : equality and 'output : comparison 
         and 'event : equality and 'event : comparison> (stateList:StateConfig<'state,'event,'output> list) = 
     
     let stateEvent = new Event<'state>()
@@ -153,6 +152,7 @@ type internal StateMachine<'state, 'event, 'output
         if trans.Guard() then 
             Option.iter trigger trans.Raises
             Option.iter transition (trans.NextState data)
+        //else look for another transition deeper...
     
     interface IStateMachine<'state, 'event, 'output> with
         ///Initializes the state machine with its initial state
@@ -169,8 +169,8 @@ type internal StateMachine<'state, 'event, 'output
             | Some x -> transition x
         ///Gets the current state
         member this.State with get() = 
-            if not started then [||] else
-            [| current.State |] //TODO: handle multiple states
+            if not started then None else
+            Some current.State  
         ///Raise on a state change
         member this.StateChanged = stateEvent.Publish
         //Raise an output event
