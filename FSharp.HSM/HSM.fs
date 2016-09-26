@@ -3,8 +3,8 @@
 type IStateMachine<'state, 'event, 'output> =
     abstract member StateChanged: IEvent<'state>
     abstract member EventRaised: IEvent<'output>
-    abstract member Init: 'state -> unit //Have it always start in first state?
-    abstract member State: 'state option with get//Make a state[] to handle multiple states?
+    abstract member Init: 'state -> unit 
+    abstract member State: 'state option with get
     abstract member Permitted: 'event [] with get
     abstract member CanFire: 'event -> bool
     abstract member IsIn: 'state -> bool
@@ -288,15 +288,6 @@ let handleIfWithRaise event guard f output state =
   { state with Transitions = state.Transitions.Add (event,
     { Event = event; NextState = f; Guard = guard; Raises = Some output }) }
 
-
-
-//Composition?
+///Connect output events from one SM to input of another
 let connect (hsm1:IStateMachine<_,_,'output>) (hsm2:IStateMachine<_,'output,_>) =
     hsm1.EventRaised.Add (fun output -> hsm2.Fire output)
-
-
-
-//allowReentry
-//allowReentryIf
-
-//onEntryFrom
