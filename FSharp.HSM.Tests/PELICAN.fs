@@ -35,11 +35,13 @@ module PELICAN =
         | Blank
         | DontWalk
 
-    
+    type Output = 
+        | Vehicle of VehicleSignal
+        | Pedestrian of PedestrianSignal
     
     type PelicanSignal() = 
 
-        let mutable hsm = Unchecked.defaultof<IStateMachine<State,Event, unit>>
+        let mutable hsm = Unchecked.defaultof<IStateMachine<State,Event, Output>>
 
         let vehicleSignal = Event<VehicleSignal>()
         let pedestrianSignal = Event<PedestrianSignal>()
@@ -66,15 +68,8 @@ module PELICAN =
             printfn "%A" state
             pedestrianSignal.Trigger state
 
-        let dontWalk() = signalPedestrians DontWalk
-        let walk() = signalPedestrians Walk
-        let blank() = signalPedestrians Blank
-
-        let green() = 
+        let pedestrianWaitingOff() = 
             isPedestrianWaiting <- false
-            signalVehicles Green
-        let yellow() = signalVehicles Yellow
-        let red() = signalVehicles Red
 
         let handleWaitingOnGreen _ =
             isPedestrianWaiting <- true
@@ -93,12 +88,17 @@ module PELICAN =
             match !flashCount with
             | 0 -> Some VehiclesEnabled
             | x when (x % 2) = 1 -> 
-                dontWalk()
+                signalPedestrians Walk
                 Some PedestriansFlash
             | _ -> 
-                blank()
+                signalPedestrians Blank
                 Some PedestriansFlash
-        
+
+        let handleEvent output =
+            match output with 
+            | Vehicle v -> signalVehicles v
+            | Pedestrian p -> signalPedestrians p
+
         do hsm <-
             [
                 configure State.Off
@@ -109,12 +109,13 @@ module PELICAN =
                     |> transitionTo VehiclesEnabled
                 configure VehiclesEnabled
                     |> substateOf Operational
-                    |> onEntry dontWalk
+                    |> enterRaises (Pedestrian(PedestrianSignal.DontWalk))
                     |> transitionTo VehiclesGreen
                 configure VehiclesGreen
                     |> substateOf VehiclesEnabled
                     |> onEntry (setTimer 10.)
-                    |> onEntry green
+                    |> onEntry pedestrianWaitingOff
+                    |> enterRaises (Vehicle(VehicleSignal.Green))
                     |> handle PedestrianWaiting handleWaitingOnGreen
                     |> handle Timeout handleTimeoutOnGreen
                 configure VehiclesGreenInt
@@ -123,16 +124,16 @@ module PELICAN =
                 configure VehiclesYellow
                     |> substateOf VehiclesEnabled
                     |> onEntry (setTimer 4.)
-                    |> onEntry yellow
+                    |> enterRaises (Vehicle(VehicleSignal.Yellow))
                     |> on Timeout PedestriansEnabled
                 configure PedestriansEnabled
                     |> substateOf Operational
                     |> transitionTo PedestriansWalk
-                    |> onEntry red
+                    |> enterRaises (Vehicle(VehicleSignal.Red))
                 configure PedestriansWalk
                     |> substateOf PedestriansEnabled
                     |> onEntry (setTimer 10.)
-                    |> onEntry walk
+                    |> enterRaises (Pedestrian(PedestrianSignal.Walk))
                     |> onExit setFlashCount
                     |> on Timeout PedestriansFlash
                 configure PedestriansFlash
@@ -142,11 +143,12 @@ module PELICAN =
 
             ]
             |> create
-
+           hsm.EventRaised.Add handleEvent
 
         member this.Start() = hsm.Init Operational
         member this.Stop() = hsm.Fire Event.Off
         member this.Walk() = hsm.Fire PedestrianWaiting
+
         member this.VehicleSignal = vehicleSignal.Publish
         member this.PedestrianSignal = pedestrianSignal.Publish
 
