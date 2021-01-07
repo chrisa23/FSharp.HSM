@@ -31,3 +31,5 @@ _ReSharper.*
 *.ncrunchproject
 *.ncrunchsolution
 *.Cache
+.fake
+.ionide
