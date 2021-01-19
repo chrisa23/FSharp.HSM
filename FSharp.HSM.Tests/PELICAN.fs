@@ -41,7 +41,7 @@ module PELICAN =
     
     type PelicanSignal() = 
 
-        let mutable hsm = Unchecked.defaultof<IStateMachine<State,Event, Output>>
+        let mutable hsm = Unchecked.defaultof<IStateMachine<State,Event, Output, unit>>
 
         let vehicleSignal = Event<VehicleSignal>()
         let pedestrianSignal = Event<PedestrianSignal>()
@@ -76,8 +76,7 @@ module PELICAN =
             None
 
         let handleTimeoutOnGreen _ =
-            if isPedestrianWaiting 
-            then Some VehiclesYellow 
+            if isPedestrianWaiting then Some VehiclesYellow 
             else Some VehiclesGreenInt
 
         let setFlashCount() = flashCount := 11

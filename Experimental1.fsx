@@ -10,33 +10,35 @@ exception NoTransition
 exception NotInitialized
 exception AlreadyStarted
 
-type IStateMachine<'state, 'event, 'output> =
+
+type IStateMachine<'state, 'event, 'output, 'data, 'extState> =
     abstract member StateChanged: IEvent<'state>
     abstract member EventRaised: IEvent<'output>
-
-    abstract member Init: 'state -> unit //Have it always start in first state?
-    abstract member State: 'state
-    abstract member Permitted: 'event list
+    abstract member Init: 'state  -> unit 
+    abstract member Init: 'state * 'extState -> unit 
+    abstract member State: 'state with get
+    abstract member ExtState: 'extState with get
+    abstract member Permitted: 'event list with get
     abstract member CanFire: 'event -> bool
     abstract member IsIn: 'state -> bool
     abstract member Fire: 'event -> unit
-    abstract member Fire: 'event * obj -> unit
+    abstract member Fire: 'event * 'data -> unit
 
 ///Holds transition information for state
-type Transition<'state, 'event> =
+type Transition<'state, 'event, 'data> =
     { Event: 'event
       Guard: unit -> bool
-      NextState: obj -> 'state option }
+      NextState: 'data option -> 'state option }
 
 ///Holds details of state
-type StateConfig<'state, 'event, 'output when 'event: comparison> =
+type StateConfig<'state, 'event, 'output, 'data when 'event: comparison> =
     { State: 'state
-      Enter: unit -> unit
+      Enter: unit -> unit//enter and exit can change extendedState
       Exit: unit -> unit
       SuperState: 'state option
-      Parents: StateConfig<'state, 'event, 'output> list
+      Parents: StateConfig<'state, 'event, 'output, 'data> list
       AutoTransition: 'state option
-      Transitions: Map<'event, Transition<'state, 'event>>
+      Transitions: Map<'event, Transition<'state, 'event, 'data>>
       EnterRaises: 'output list
       ExitRaises: 'output list }
 
@@ -82,8 +84,8 @@ let rec findTransition event state parents =
 
 ///Try and find a common state among state lists
 let rec findCommon
-    (list1: StateConfig<'state, 'event, 'output> list)
-    (list2: StateConfig<'state, 'event, 'output> list)
+    (list1: StateConfig<'state, 'event, 'output, 'data> list)
+    (list2: StateConfig<'state, 'event, 'output, 'data> list)
     =
     if list1.IsEmpty || list2.IsEmpty then
         None
@@ -123,15 +125,17 @@ let exitThenEnterParents current newParents =
     exitParents takeWhile current.Parents
     enterParents takeWhile newParents
 
-type internal StateMachine<'state, 'event, 'output when 'state: equality and 'state: comparison and 'event: equality and 'event: comparison>(stateList: StateConfig<'state, 'event, 'output> list) =
+type internal StateMachine<'state, 'event, 'output, 'data, 'extState when 'state: equality and 'state: comparison and 'event: equality and 'event: comparison>(stateList: StateConfig<'state, 'event, 'output, 'data> list) =
 
     let stateEvent = new Event<'state>()
     let outputEvent = new Event<'output>()
 
     let mutable current =
-        Unchecked.defaultof<StateConfig<'state, 'event, 'output>>
+        Unchecked.defaultof<StateConfig<'state, 'event, 'output, 'data>>
 
     let mutable started = false
+
+    let mutable extState = Unchecked.defaultof<'extState>
 
     let configs = stateList |> createStateMap
 
@@ -168,7 +172,8 @@ type internal StateMachine<'state, 'event, 'output when 'state: equality and 'st
         if trans.Guard() then
             Option.iter transition (trans.NextState data)
 
-    interface IStateMachine<'state, 'event, 'output> with
+    interface IStateMachine<'state, 'event, 'output, 'data, 'extState> with
+        member this.ExtState with get() = extState
         ///Initializes the state machine with its initial state
         member this.Init state =
             started <- true
@@ -181,8 +186,11 @@ type internal StateMachine<'state, 'event, 'output when 'state: equality and 'st
             match current.AutoTransition with
             | None -> ()
             | Some x -> transition x
+        member this.Init(state, exState) = 
+            extState <- exState
+            (this :>  IStateMachine<'state, 'event, 'output, 'data, 'extState>).Init state
         ///Gets the current state
-        member this.State =
+        member this.State with get() =
             if not started then raise NotInitialized
             current.State
         ///Raise on a state change
@@ -190,7 +198,7 @@ type internal StateMachine<'state, 'event, 'output when 'state: equality and 'st
         //Raise an output event
         member this.EventRaised = outputEvent.Publish
 
-        member this.Permitted =
+        member this.Permitted with get() =
             if not started then raise NotInitialized
             current.Transitions |> Map.toList |> List.map fst
 
@@ -214,7 +222,7 @@ type internal StateMachine<'state, 'event, 'output when 'state: equality and 'st
             let trans =
                 findTransition event current current.Parents
 
-            Option.iter (tryTransition null) trans
+            Option.iter (tryTransition None) trans
 
         ///Fire an event with data
         member this.Fire(event, data) =
@@ -223,14 +231,14 @@ type internal StateMachine<'state, 'event, 'output when 'state: equality and 'st
             let trans =
                 findTransition event current current.Parents
 
-            Option.iter (tryTransition data) trans
+            Option.iter (tryTransition (Some data)) trans
 
 let internal empty = fun () -> ()
 let internal tru = fun () -> true
 
 ///Create a state machine from configuration list
-let create (stateList: StateConfig<'state, 'event, 'output> list) =
-    (StateMachine<'state, 'event, 'output>(stateList)) :> IStateMachine<'state, 'event, 'output>
+let create (stateList: StateConfig<'state, 'event, 'output, 'data> list) =
+    (StateMachine<'state, 'event, 'output, 'data, 'extState>(stateList)) :> IStateMachine<'state, 'event, 'output, 'data, 'extState>
 
 //###################################################################################
 //Builder DSL
@@ -248,7 +256,7 @@ let configure state =
       AutoTransition = None
       EnterRaises = []
       ExitRaises = []
-      Transitions = new Map<'event, Transition<'state, 'event>>([]) }
+      Transitions = new Map<'event, Transition<'state, 'event, 'data>>([]) }
 
 ///Sets am action on the entry of the state
 let onEntry f state = { state with Enter = state.Enter >> f }

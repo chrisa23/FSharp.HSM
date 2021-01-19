@@ -24,7 +24,7 @@ module FunctionTests =
         | Output1
         | Output2
 
-    let testStateList1: StateConfig<States, Events, Output> list =
+    let testStateList1: StateConfig<States, Events, Output, unit> list =
         [ configure State1
           |> onEntry (fun () -> printfn "Enter State1")
           |> on Event1 State2

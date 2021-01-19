@@ -19,10 +19,14 @@ module TradeTest =
      | Start 
      | Fill
      | Exit
-     | Increase
-     | Decrease
+     | Increase 
+     | Decrease 
 
     type Fill = { Price: float; Quantity: int; Time: int64; }
+
+    type Data = 
+        | Int of int
+        | Fill of Fill
 
     type Trade() = 
         let send p = 
@@ -51,14 +55,14 @@ module TradeTest =
             [ configure NotStarted
                 |> handle Start send //handle
               configure InMarket
-                |> handle Fill onFill //handle 
+                |> handle Trigger.Fill onFill //handle 
                 |> handle Exit cancel
               configure InTrade
                 |> handle Increase increase
                 |> handle Decrease decrease
                 |> handle Exit exit
               configure Exiting
-                |> handle Fill onExitFill
+                |> handle Trigger.Fill onExitFill
               configure Completed 
                 |> onEntry (fun _ -> printfn "calcPL")] 
         do 
@@ -78,15 +82,15 @@ module TradeTest =
 
       check trade [InMarket] [ Completed ]
 
-      fireW trade Fill { Price = 3.0; Quantity = 2; Time = 3L; }
+      fireW trade Trigger.Fill (Data.Fill ({ Price = 3.0; Quantity = 2; Time = 3L; }))
       
       check trade [InTrade] [InMarket;  Completed; ]
 
-      fireW trade Increase 1
+      fireW trade Increase (Data.Int( 1))
       
       check trade [InTrade] [InMarket;  Completed; ]
 
-      fireW trade Decrease 1
+      fireW trade Decrease (Data.Int( 1))
       
       check trade [InTrade] [InMarket;  Completed; ]
 
@@ -94,7 +98,7 @@ module TradeTest =
       
       check trade [Exiting] [InMarket;  InTrade; Completed; ]
 
-      fireW trade Fill  { Price = 3.0; Quantity = 2; Time = 3L; }
+      fireW trade Trigger.Fill (Data.Fill ({ Price = 3.0; Quantity = 2; Time = 3L; }))
 
       check trade [Completed] [InMarket;  InTrade; Exiting]
 

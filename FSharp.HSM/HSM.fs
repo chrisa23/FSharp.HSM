@@ -1,6 +1,6 @@
 ﻿module FSharp.HSM
 
-type IStateMachine<'state, 'event, 'output> =
+type IStateMachine<'state, 'event, 'output, 'data> =
     abstract member StateChanged: IEvent<'state>
     abstract member EventRaised: IEvent<'output>
     abstract member Init: 'state -> unit
@@ -9,24 +9,24 @@ type IStateMachine<'state, 'event, 'output> =
     abstract member CanFire: 'event -> bool
     abstract member IsIn: 'state -> bool
     abstract member Fire: 'event -> unit
-    abstract member Fire: 'event * obj -> unit
+    abstract member Fire: 'event * 'data -> unit
 
 ///Holds transition information for state
-type Transition<'state, 'event, 'output> =
+type Transition<'state, 'event, 'output, 'data> =
     { Event: 'event
       Guard: unit -> bool
       Raises: 'output option
-      NextState: obj -> 'state option }
+      NextState: 'data option -> 'state option }
 
 ///Holds details of state
-type StateConfig<'state, 'event, 'output when 'event: comparison> =
+type StateConfig<'state, 'event, 'output, 'data when 'event: comparison> =
     { State: 'state
       Enter: unit -> unit
       Exit: unit -> unit
       SuperState: 'state option
-      Parents: StateConfig<'state, 'event, 'output> list
+      Parents: StateConfig<'state, 'event, 'output, 'data> list
       AutoTransition: 'state option
-      Transitions: Map<'event, Transition<'state, 'event, 'output>>
+      Transitions: Map<'event, Transition<'state, 'event, 'output, 'data>>
       EnterRaises: 'output list
       ExitRaises: 'output list }
 
@@ -74,8 +74,8 @@ module internal Core =
 
     ///Try and find a common state among state lists
     let rec findCommon
-        (list1: StateConfig<'state, 'event, 'output> list)
-        (list2: StateConfig<'state, 'event, 'output> list)
+        (list1: StateConfig<'state, 'event, 'output, 'data> list)
+        (list2: StateConfig<'state, 'event, 'output, 'data> list)
         =
         if list1.IsEmpty || list2.IsEmpty then
             None
@@ -127,13 +127,13 @@ module internal Core =
     let getTransitions state =
         state.Transitions |> Map.toArray |> Array.map fst
 
-    type internal StateMachine<'state, 'event, 'output when 'state: equality and 'state: comparison and 'event: equality and 'event: comparison>(stateList: StateConfig<'state, 'event, 'output> list) =
+    type internal StateMachine<'state, 'event, 'output, 'data when 'state: equality and 'state: comparison and 'event: equality and 'event: comparison>(stateList: StateConfig<'state, 'event, 'output, 'data> list) =
 
         let stateEvent = new Event<'state>()
         let outputEvent = new Event<'output>()
 
         let mutable current =
-            Unchecked.defaultof<StateConfig<'state, 'event, 'output>>
+            Unchecked.defaultof<StateConfig<'state, 'event, 'output, 'data>>
 
         let mutable started = false
 
@@ -175,7 +175,7 @@ module internal Core =
                 Option.iter transition (trans.NextState data)
         //else look for another transition deeper...
 
-        interface IStateMachine<'state, 'event, 'output> with
+        interface IStateMachine<'state, 'event, 'output, 'data> with
             ///Initializes the state machine with its initial state
             member this.Init state =
                 started <- true
@@ -217,7 +217,7 @@ module internal Core =
                 if not started then
                     false
                 else
-                    Array.contains event (this :> IStateMachine<_, 'event, _>).Permitted
+                    Array.contains event (this :> IStateMachine<_, 'event, _, _>).Permitted
 
             ///Check whether in state or parent state
             member this.IsIn(state: 'state) =
@@ -236,7 +236,7 @@ module internal Core =
                     let trans =
                         findTransition event current current.Parents
 
-                    Option.iter (tryTransition null) trans
+                    Option.iter (tryTransition None) trans
 
             ///Fire an event with data
             member this.Fire(event, data) =
@@ -246,14 +246,14 @@ module internal Core =
                     let trans =
                         findTransition event current current.Parents
 
-                    Option.iter (tryTransition data) trans
+                    Option.iter (tryTransition (Some data)) trans
 
 let private noop = fun () -> ()
 let private alwaysTrue = fun () -> true
 
 ///Create a state machine from configuration list
-let create (stateList: StateConfig<'state, 'event, 'output> list) =
-    (Core.StateMachine<'state, 'event, 'output>(stateList)) :> IStateMachine<'state, 'event, 'output>
+let create (stateList: StateConfig<'state, 'event, 'output, 'data> list) =
+    (Core.StateMachine<'state, 'event, 'output, 'data>(stateList)) :> IStateMachine<'state, 'event, 'output, 'data>
 
 //###################################################################################
 //Builder DSL
@@ -271,7 +271,7 @@ let configure state =
       AutoTransition = None
       EnterRaises = []
       ExitRaises = []
-      Transitions = new Map<'event, Transition<'state, 'event, 'output>>([]) }
+      Transitions = new Map<'event, Transition<'state, 'event, 'output, 'data>>([]) }
 
 ///Sets am action on the entry of the state
 let onEntry f state = { state with Enter = state.Enter >> f }
@@ -392,5 +392,5 @@ let handleIfWithRaise event guard f output state =
               ) }
 
 ///Connect output events from one SM to input of another
-let connect (hsm1: IStateMachine<_, _, 'output>) (hsm2: IStateMachine<_, 'output, _>) =
-    hsm1.EventRaised.Add(fun output -> hsm2.Fire output)
+//let connect (hsm1: IStateMachine<_, _, 'output>) (hsm2: IStateMachine<_, 'output, _>) =
+//    hsm1.EventRaised.Add(fun output -> hsm2.Fire output)

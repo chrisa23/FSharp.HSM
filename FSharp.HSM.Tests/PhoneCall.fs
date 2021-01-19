@@ -20,6 +20,25 @@ type Trigger =
     | PlacedOnHold
     | TakenOffHold
 
+type Digit = 
+    | D0
+    | D1
+    | D2
+    | D3
+    | D4
+    | D5
+    | D6
+    | D7
+    | D8
+    | D9
+
+type InternalState = {
+    DigitsDialed: Digit list
+}
+
+//todo:
+//add Dial with Data of number
+
 let mutable timerOn = false
 
 let startTimer() = 

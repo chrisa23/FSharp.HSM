@@ -85,7 +85,7 @@ type ComplexHSM() =
 
     member this.Hsm = hsm
 
-let fireF (hsm: IStateMachine<State, Sig, unit>) signal =
+let fireF (hsm: IStateMachine<State, Sig, unit, unit>) signal =
     printfn "fire %A" signal
     hsm.Fire(signal)
 

@@ -18,25 +18,32 @@ module OrderTest =
      | Rejected
      | Canceled
 
+    type Fill = { Price: float; Quantity: int; Time: int64; }
     type Trigger =
      | Send 
      | ExchAck
-     | Fill
+     | Fill// of Fill
      | Cancel
      | ExchReject
      //| Amend
     
     exception Overfill
 
-    type Fill = { Price: float; Quantity: int; Time: int64; }
+    
 
     type Order(qty) = 
         let mutable qtyFilled = 0
-        let fillFunc fill = 
-            qtyFilled <- qtyFilled + (unbox fill).Quantity
-            if qtyFilled = qty then Some(Filled) else
-            if qtyFilled > qty then raise Overfill
-            Some(PartFilled)
+        let fillFunc (fill: Fill option) = 
+            match fill with
+            | Some f -> qtyFilled <- qtyFilled + f.Quantity
+            | None -> ()
+            if qtyFilled = qty then 
+                Some(Filled) 
+            elif qtyFilled > qty then 
+                raise Overfill
+            elif qtyFilled > 0 then
+                Some(PartFilled)
+            else Some(Working)//should actually return current state...
         //handle fill, if fully filled return Filled else PartFilled
         let state = 
           create
@@ -45,7 +52,7 @@ module OrderTest =
               configure Sent
                 |> on ExchAck Working
               configure Working
-                |> handle Fill fillFunc //handle 
+                |> handle Trigger.Fill fillFunc //handle 
                 |> on ExchReject Rejected
               configure PartFilled
                 |> substateOf Working 
